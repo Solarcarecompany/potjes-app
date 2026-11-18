@@ -60,7 +60,7 @@
   .bar b.warn{background:var(--warn)} .bar b.bad{background:var(--bad)}
   .pct{color:var(--mute);font-size:13px}
   .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .tile{background:var(--card);border-radius:14px;padding:14px}
+  .tile{background:var(--card);border-radius:14px;padding:14px} .tile[data-tile],.tile[data-rtile]{cursor:pointer}
   .tile .k{color:var(--ink-2);font-size:13px}
   .tile .v{font:600 26px/1.1 var(--sans);letter-spacing:-.01em;margin-top:4px}
   .tile .s{color:var(--mute);font-size:12px;margin-top:4px}
@@ -153,7 +153,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v4.4</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v4.5</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -452,10 +452,10 @@ function renderReserve(r){
   if (!r){ $("#reserve").innerHTML=""; return; }
   const sinds = r.vanaf ? "sinds "+dateNL(r.vanaf) : "dit jaar";
   $("#reserve").innerHTML = `
-    <div class="tile"><div class="k">Btw dit kwartaal</div><div class="v num">${eur(Number(r.btw_kwartaal_te_betalen))}</div><div class="s">21% over omzet min voorbelasting op kosten</div></div>
-    <div class="tile"><div class="k">Vpb ${sinds} (schatting)</div><div class="v num">${eur(Number(r.vpb_jaar_schatting))}</div><div class="s">winst ≈ ${eur(Number(r.winst_jaar_schatting))}; ${eur(Number(r.vpb_betaald))} al betaald via voorlopige aanslag${Number(r.vpb_betaald_ander_jaar)?` (+ ${eur(Number(r.vpb_betaald_ander_jaar))} over een ander jaar)`:""}</div></div>
-    <div class="tile"><div class="k">Omzet ${sinds} (ex btw)</div><div class="v num">${eur(Number(r.omzet_jaar_ex))}</div><div class="s">uit de bank${Number(r.correctie_jaar)?`, ${eur(Math.abs(Number(r.correctie_jaar)))} nabetaling 2025 eruit`:""}</div></div>
-    <div class="tile"><div class="k">Loonkosten ${sinds}</div><div class="v num">${eur(Number(r.loonkosten_jaar))}</div><div class="s">${eur(Number(r.nettoloon_jaar))} netto (€4.450/mnd gerekend) + ${eur(Number(r.loonheffing_jaar))} loonheffing</div></div>`;
+    <div class="tile" data-rtile="h_btw" data-title="Btw betaald"><div class="k">Btw dit kwartaal</div><div class="v num">${eur(Number(r.btw_kwartaal_te_betalen))}</div><div class="s">21% over omzet min voorbelasting op kosten</div></div>
+    <div class="tile" data-rtile="h_vpb" data-title="Vpb betaald"><div class="k">Vpb ${sinds} (schatting)</div><div class="v num">${eur(Number(r.vpb_jaar_schatting))}</div><div class="s">winst ≈ ${eur(Number(r.winst_jaar_schatting))}; ${eur(Number(r.vpb_betaald))} al betaald via voorlopige aanslag${Number(r.vpb_betaald_ander_jaar)?` (+ ${eur(Number(r.vpb_betaald_ander_jaar))} over een ander jaar)`:""}</div></div>
+    <div class="tile" data-rtile="h_omzet" data-title="Omzet"><div class="k">Omzet ${sinds} (ex btw)</div><div class="v num">${eur(Number(r.omzet_jaar_ex))}</div><div class="s">uit de bank${Number(r.correctie_jaar)?`, ${eur(Math.abs(Number(r.correctie_jaar)))} nabetaling 2025 eruit`:""}</div></div>
+    <div class="tile" data-rtile="h_loonheffing,h_loon" data-title="Loonheffing"><div class="k">Loonkosten ${sinds}</div><div class="v num">${eur(Number(r.loonkosten_jaar))}</div><div class="s">${eur(Number(r.nettoloon_jaar))} netto (€4.450/mnd gerekend) + ${eur(Number(r.loonheffing_jaar))} loonheffing</div></div>`;
 }
 function hRange(){
   const n=new Date();
@@ -477,15 +477,19 @@ function renderHoldingMonth(htx, hp){
   const months = hMode==="y" ? (hOff<0?12:new Date().getMonth()+1) : 1;
   const loon = loonPot*months, rc = prive-loon;
   $("#h-tiles").innerHTML = `
-    <div class="tile"><div class="k">Managementfee binnen</div><div class="v num" style="color:var(--ok)">${eur(binnen)}</div><div class="s">${rows.filter(t=>t.pot_id==="h_omzet").length}× ontvangen</div></div>
-    <div class="tile"><div class="k">Naar privé</div><div class="v num">${eur(prive)}</div><div class="s">loon ${eur(loon)} · rekening-courant ${rc>=0?"+":"−"}${eur(Math.abs(rc))}</div></div>
-    <div class="tile"><div class="k">Belastingen betaald</div><div class="v num">${eur(belasting)}</div><div class="s">loonheffing, btw, vpb</div></div>
-    <div class="tile"><div class="k">Kosten</div><div class="v num">${eur(kosten)}</div><div class="s">boekhouder, telefoon, aankopen, bank</div></div>
-    ${beleg ? `<div class="tile"><div class="k">Belegd / gestort</div><div class="v num">${eur(beleg)}</div><div class="s">bitcoin, deelneming</div></div>` : ""}
-    <div class="tile"><div class="k">Saldo-effect</div><div class="v num" style="${binnen-prive-belasting-kosten-beleg<0?"color:var(--warn)":""}">${eur(binnen-prive-belasting-kosten-beleg)}</div><div class="s">binnen min alles eruit</div></div>`;
+    <div class="tile" data-tile="h_omzet,h_dividend" data-title="Binnen"><div class="k">Managementfee binnen</div><div class="v num" style="color:var(--ok)">${eur(binnen)}</div><div class="s">${rows.filter(t=>t.pot_id==="h_omzet").length}× ontvangen</div></div>
+    <div class="tile" data-tile="h_rc,h_loon,h_km" data-title="Naar privé"><div class="k">Naar privé</div><div class="v num">${eur(prive)}</div><div class="s">loon ${eur(loon)} · rekening-courant ${rc>=0?"+":"−"}${eur(Math.abs(rc))}</div></div>
+    <div class="tile" data-tile="h_loonheffing,h_btw,h_vpb" data-title="Belastingen"><div class="k">Belastingen betaald</div><div class="v num">${eur(belasting)}</div><div class="s">loonheffing, btw, vpb</div></div>
+    <div class="tile" data-tile="h_boekhouder,h_kosten,h_verzekering,h_inkoop" data-title="Kosten"><div class="k">Kosten</div><div class="v num">${eur(kosten)}</div><div class="s">boekhouder, telefoon, aankopen, bank</div></div>
+    ${beleg ? `<div class="tile" data-tile="h_belegging,h_deelneming" data-title="Belegd / gestort"><div class="k">Belegd / gestort</div><div class="v num">${eur(beleg)}</div><div class="s">bitcoin, deelneming</div></div>` : ""}
+    <div class="tile" data-tile="*" data-title="Alles"><div class="k">Saldo-effect</div><div class="v num" style="${binnen-prive-belasting-kosten-beleg<0?"color:var(--warn)":""}">${eur(binnen-prive-belasting-kosten-beleg)}</div><div class="s">binnen min alles eruit</div></div>`;
   const list = hp.filter(p=>by[p.id]);
   $("#h-pots-month").innerHTML = list.length ? list.map(p=>`<div class="row" data-hpot="${p.id}"><div class="l">${esc(p.label)}<div class="s" style="color:var(--mute);font-size:12px">${rows.filter(t=>t.pot_id===p.id).length}×</div></div><div class="r num" style="${by[p.id]>0?"color:var(--ok)":""}">${by[p.id]>0?"+":"−"}${eur(Math.abs(by[p.id]))}</div></div>`).join("") : `<div class="empty">Geen mutaties in deze periode.</div>`;
   document.querySelectorAll("#h-pots-month .row").forEach(el=>el.addEventListener("click",()=>openPot(el.dataset.hpot, true, rows)));
+  document.querySelectorAll("#h-tiles .tile[data-tile]").forEach(el=>el.addEventListener("click",()=>{
+    const ids = el.dataset.tile==="*" ? hp.map(p=>p.id) : el.dataset.tile.split(",");
+    openPot(ids, true, rows, el.dataset.title+" · "+label);
+  }));
 }
 $("#h-prev").addEventListener("click", ()=>{ hOff--; renderHoldingMonth(HTX, HP); });
 $("#h-next").addEventListener("click", ()=>{ if (hOff<0){ hOff++; renderHoldingMonth(HTX, HP); } });
@@ -501,15 +505,16 @@ let current = null, potView = null;
 function openSheet(){ $("#sheet-bg").classList.add("open"); }
 function closeSheet(){ $("#sheet-bg").classList.remove("open"); potView=null; }
 $("#sheet-bg").addEventListener("click",(e)=>{ if (e.target.id==="sheet-bg") closeSheet(); });
-$("#sheet-back").addEventListener("click", ()=>{ if (potView) openPot(potView.id, potView.all, potView.source); });
+$("#sheet-back").addEventListener("click", ()=>{ if (potView) openPot(potView.id, potView.all, potView.source, potView.title); });
 
-function openPot(potId, all=false, source=null){
-  potView = {id:potId, all, source};
+function openPot(potId, all=false, source=null, title=null){
+  potView = {id:potId, all, source, title};
+  const ids = Array.isArray(potId) ? potId : [potId];
   const [ms, me] = monthRange();
-  const rows = (source||tx).filter(t=>t.pot_id===potId && (all || (t.booking_date>=ms && t.booking_date<=me))).sort((a,b)=>b.booking_date.localeCompare(a.booking_date));
+  const rows = (source||tx).filter(t=>ids.includes(t.pot_id) && (all || (t.booking_date>=ms && t.booking_date<=me))).sort((a,b)=>b.booking_date.localeCompare(a.booking_date));
   const total = rows.reduce((s,t)=>s-Number(t.amount),0);
   $("#sheet-back").classList.add("hidden");
-  $("#sheet-title").innerHTML = `${esc(potLabel(potId))}<small>${all?"alles":"deze maand"} · ${eur(total)}</small>`;
+  $("#sheet-title").innerHTML = `${esc(title || potLabel(ids[0]))}<small>${all?(source===tx?"alles":"deze periode"):"deze maand"} · ${eur(Math.abs(total))}</small>`;
   $("#sheet-meta").textContent = rows.length ? "Tik op een regel om hem te verplaatsen." : "";
   $("#sheet-body").innerHTML = rows.length ? rows.map(txRow).join("") : `<div class="empty">Niets in dit potje${all?"":" deze maand"}.</div>`;
   bindTx("#sheet-body");
