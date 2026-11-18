@@ -125,6 +125,8 @@
   .hnav .seg{display:flex;background:var(--card);border-radius:9px;padding:3px}
   .hnav .seg button{width:auto;height:auto;border-radius:7px;font:inherit;font-size:13px;padding:5px 10px;background:none;color:var(--ink-2)}
   .hnav .seg button.on{background:var(--ink);color:#fff}
+  .recur{display:block;width:100%;margin-top:12px;font:inherit;font-size:14px;padding:11px;border:1px dashed var(--line);border-radius:10px;background:none;color:var(--ink-2);cursor:pointer}
+  .chk .x{color:var(--mute);font-size:18px;padding:0 0 0 10px;cursor:pointer}
   .hidden{display:none}
   @media (prefers-reduced-motion:reduce){.jar .fill,.toast{transition:none}}
 </style>
@@ -153,7 +155,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v4.7</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v4.8</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -446,8 +448,13 @@ $("#f-rc").addEventListener("submit", async (e)=>{
   toast(error ? "Opslaan mislukt: "+error.message : "Stand opgeslagen"); if (!error){ e.target.reset(); load(); }
 });
 function renderExpected(rows){
-  $("#expected").innerHTML = rows.length ? rows.map(r=>`<div class="chk ${r.status}" data-epot="${r.pot_id||""}" style="cursor:pointer"><i></i><div><div class="l">${esc(r.label)}</div><div class="s">${r.status==="open" ? (r.day_of_month?`verwacht rond de ${r.day_of_month}e`:"nog niet gezien") : `${r.aantal>1?r.aantal+"× · ":""}laatste ${dateNL(r.gezien_op)} · ${eur2(Math.abs(Number(r.gezien_bedrag)))}${r.status==="afwijkend"?" · wijkt af van "+eur(Number(r.expected_amount)):""}`}</div></div><div class="r">${r.status==="open"?"open":r.status==="deels"?`${r.aantal} van ${r.expected_count}`:r.status==="afwijkend"?"check":"✓"}</div></div>`).join("") : `<div class="empty">Geen verwachte posten ingesteld.</div>`;
-  document.querySelectorAll("#expected .chk[data-epot]").forEach(el=>el.addEventListener("click",()=>{ if (el.dataset.epot) openPot(el.dataset.epot, false, HTX); }));
+  $("#expected").innerHTML = rows.length ? rows.map(r=>`<div class="chk ${r.status}" data-epot="${r.pot_id||""}" style="cursor:pointer"><i></i><div><div class="l">${esc(r.label)}</div><div class="s">${r.status==="open" ? (r.day_of_month?`verwacht rond de ${r.day_of_month}e`:"nog niet gezien") : `${r.aantal>1?r.aantal+"× · ":""}laatste ${dateNL(r.gezien_op)} · ${eur2(Math.abs(Number(r.gezien_bedrag)))}${r.status==="afwijkend"?" · wijkt af van "+eur(Number(r.expected_amount)):""}`}</div></div><div class="r">${r.status==="open"?"open":r.status==="deels"?`${r.aantal} van ${r.expected_count}`:r.status==="afwijkend"?"check":"✓"}<span class="x" data-del="${r.id}" title="niet meer verwachten">×</span></div></div>`).join("") : `<div class="empty">Geen verwachte posten ingesteld.</div>`;
+  document.querySelectorAll("#expected .chk[data-epot]").forEach(el=>el.addEventListener("click",(e)=>{ if (e.target.dataset.del) return; if (el.dataset.epot) openPot(el.dataset.epot, false, HTX); }));
+  document.querySelectorAll("#expected .x[data-del]").forEach(el=>el.addEventListener("click", async (e)=>{
+    e.stopPropagation(); if (!confirm("Deze post niet meer verwachten?")) return;
+    const { error } = await sb.from("expected_items").update({active:false}).eq("id", Number(el.dataset.del));
+    toast(error ? "Mislukt: "+error.message : "Weggehaald"); if (!error) load();
+  }));
 }
 function renderReserve(r){
   if (!r){ $("#reserve").innerHTML=""; return; }
@@ -531,8 +538,17 @@ function openPicker(d, fromPot=false){
   $("#sheet-title").textContent = d.name || "Transactie";
   $("#sheet-meta").textContent = `${dateNL(d.date)} · ${eur2(Number(d.amount))} · nu: ${potLabel(d.pot)}`;
   const choices = allPots.filter(p=>(p.scope||"prive")===(d.scope||"prive")).sort((a,b)=>(d.scope==="holding"?a.sort_order-b.sort_order:POT_ORDER.indexOf(a.id)-POT_ORDER.indexOf(b.id)));
-  $("#sheet-body").innerHTML = `<div class="pots">${choices.map(p=>`<button type="button" data-pot="${p.id}" class="${p.id===d.pot?"sel":""}">${esc(p.label)}</button>`).join("")}</div>`;
-  $("#sheet-body").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>setPot(b.dataset.pot)));
+  const rec = d.scope==="holding" ? `<button type="button" id="mk-expected" class="recur">↻ Elke maand verwacht</button>` : "";
+  $("#sheet-body").innerHTML = `<div class="pots">${choices.map(p=>`<button type="button" data-pot="${p.id}" class="${p.id===d.pot?"sel":""}">${esc(p.label)}</button>`).join("")}</div>${rec}`;
+  $("#sheet-body").querySelectorAll(".pots button").forEach(b=>b.addEventListener("click",()=>setPot(b.dataset.pot)));
+  if (rec) $("#mk-expected").addEventListener("click", async ()=>{
+    const name = (d.name||"").replace(/^Naam: /,"").split(" Omschrijving")[0].trim();
+    const word = name.split(/\s+/).slice(0,2).join(" ").replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+    const n = prompt("Hoeveel keer per maand komt dit?", "1"); if (n===null) return;
+    const { error } = await sb.from("expected_items").insert({ scope:"holding", label:name, pot_id:d.pot||null, pattern:word,
+      day_of_month:Number(d.date.slice(8,10)), expected_amount:Math.abs(Number(d.amount)), tolerance_pct:30, expected_count:Math.max(1,Number(n)||1) });
+    closeSheet(); toast(error ? "Mislukt: "+error.message : `${name} staat nu bij verwacht`); if (!error) load();
+  });
   openSheet();
 }
 async function setPot(pot){
