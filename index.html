@@ -102,6 +102,23 @@
   .err{color:var(--bad);font-size:14px;margin-top:10px;min-height:1.2em}
   .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:30}
   .toast.show{opacity:1}
+  .tabs{display:flex;gap:6px;background:var(--card);border-radius:12px;padding:4px;margin:6px 0 14px}
+  .tabs button{flex:1;border:0;background:none;font:inherit;font-size:14px;font-weight:500;padding:9px;border-radius:9px;color:var(--ink-2);cursor:pointer}
+  .tabs button.on{background:var(--ink);color:#fff}
+  .rc{background:var(--ink);color:#fff;border-radius:18px;padding:16px}
+  .rc .k{color:rgba(255,255,255,.72);font-size:14px}
+  .rc .big{font:600 44px/1 var(--sans);letter-spacing:-.02em;margin:4px 0 8px}
+  .rc .sub{color:rgba(255,255,255,.72);font-size:13px}
+  .rc details{margin-top:12px;font-size:13px} .rc summary{cursor:pointer;color:rgba(255,255,255,.85)}
+  .rc form{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .rc input{font:inherit;font-size:15px;padding:9px 10px;border:0;border-radius:8px}
+  .rc form button{grid-column:1/-1;font:inherit;font-weight:500;padding:10px;border:0;border-radius:8px;background:#DCE9E4;color:var(--ink);cursor:pointer}
+  .chk{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
+  .chk:last-child{border-bottom:0}
+  .chk i{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);display:inline-block}
+  .chk.ok i{background:var(--ok);border-color:var(--ok)} .chk.afwijkend i{background:var(--warn);border-color:var(--warn)}
+  .chk .l{font-weight:500} .chk .s{color:var(--mute);font-size:13px}
+  .chk .r{text-align:right;font-size:13px;color:var(--ink-2)}
   .hidden{display:none}
   @media (prefers-reduced-motion:reduce){.jar .fill,.toast{transition:none}}
 </style>
@@ -130,10 +147,49 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v3.2</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v4.0</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
+  <div class="tabs" role="tablist">
+    <button type="button" id="tab-prive" class="on" role="tab">Privé</button>
+    <button type="button" id="tab-holding" role="tab">Holding</button>
+  </div>
+
+  <div id="view-holding" class="hidden">
+    <section class="rc" aria-label="Rekening-courant">
+      <div class="k">Rekening-courant: wat jij de holding schuldig bent</div>
+      <div class="big num" id="rc-now">–</div>
+      <div class="sub" id="rc-sub">Nog geen stand ingevuld. Vraag Richard de stand per een datum.</div>
+      <details>
+        <summary>Nieuwe stand van Richard invullen</summary>
+        <form id="f-rc">
+          <input id="rc-date" type="date" required>
+          <input id="rc-amount" type="number" step="0.01" inputmode="decimal" placeholder="bedrag, bv. 70000" required>
+          <input id="rc-pct" type="number" step="0.01" inputmode="decimal" placeholder="rente % (optioneel)">
+          <input id="rc-note" type="text" placeholder="notitie, bv. per 31-10 volgens Richard">
+          <button type="submit">Stand opslaan</button>
+        </form>
+      </details>
+    </section>
+
+    <h2>Deze maand verwacht</h2>
+    <div class="card" id="expected"></div>
+
+    <h2>Opzij te zetten (schatting, geen boekhouding)</h2>
+    <div class="tiles" id="reserve"></div>
+
+    <h2 id="h-month-title">Deze maand per post</h2>
+    <div class="card" id="h-pots-month"></div>
+
+    <h2 id="h-review-title">Nog in te delen</h2>
+    <div class="card" id="h-review"></div>
+
+    <h2>Laatste mutaties holding</h2>
+    <div class="card" id="h-recent"></div>
+  </div>
+
+  <div id="view-prive">
   <section class="week" aria-label="Leefgeld per week">
     <div class="nav">
       <button id="w-prev" type="button" aria-label="vorige week">‹</button>
@@ -170,6 +226,7 @@
 
   <h2>Laatste bij- en afschrijvingen</h2>
   <div class="card" id="recent"></div>
+  </div>
 </main>
 
 <div class="sheet-bg" id="sheet-bg">
@@ -197,8 +254,8 @@ const ls = { get:(k)=>{try{return localStorage.getItem(k)}catch{return null}}, s
 const esc = (s) => String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
 
 if (SUPABASE_KEY.startsWith("__")) SUPABASE_KEY = ls.get("potjes.key") || "";
-let sb = null, pots = [], tx = [], weekOffset = 0;
-const potLabel = (id)=> (pots.find(p=>p.id===id)||{}).label || id || "kies potje";
+let sb = null, pots = [], allPots = [], tx = [], weekOffset = 0, view = (location.hash==="#holding"?"holding":"prive"), accountRole = {};
+const potLabel = (id)=> (allPots.find(p=>p.id===id)||{}).label || id || "kies potje";
 
 function show(id){ for (const s of ["login","setup","app"]) $("#"+s).classList.toggle("hidden", s!==id); }
 
@@ -218,6 +275,10 @@ $("#f-login").addEventListener("submit", async (e)=>{
   ls.set("potjes.email",email); show("app"); await load();
 });
 $("#refresh").addEventListener("click", load);
+function setView(v){ view=v; $("#view-prive").classList.toggle("hidden", v!=="prive"); $("#view-holding").classList.toggle("hidden", v!=="holding"); $("#tab-prive").classList.toggle("on", v==="prive"); $("#tab-holding").classList.toggle("on", v==="holding"); if (v==="holding") history.replaceState(null,"","#holding"); else history.replaceState(null,""," "); }
+$("#tab-prive").addEventListener("click", ()=>setView("prive"));
+$("#tab-holding").addEventListener("click", ()=>setView("holding"));
+window.addEventListener("hashchange", ()=>setView(location.hash==="#holding"?"holding":"prive"));
 $("#logout").addEventListener("click", async ()=>{ await sb.auth.signOut(); show("login"); });
 $("#w-prev").addEventListener("click", ()=>{ weekOffset++; renderWeek(); });
 $("#w-next").addEventListener("click", ()=>{ if (weekOffset>0){ weekOffset--; renderWeek(); } });
@@ -233,12 +294,22 @@ async function q(view, opts={}){
 
 async function load(){
   try{
-    const [potRows, txRows, projects, tiles, review, recent, sync] = await Promise.all([
-      q("pots"), q("v_leefgeld_tx"), q("v_projecten"), q("v_spaarpotjes"), q("v_te_beoordelen",{limit:30}), q("v_recent",{limit:40}), q("v_sync")
+    const [potRows, txRows, projects, tiles, review, recent, sync, rc, expected, reserve] = await Promise.all([
+      q("pots"), q("v_leefgeld_tx"), q("v_projecten"), q("v_spaarpotjes"), q("v_te_beoordelen",{limit:60}), q("v_recent",{limit:80}), q("v_sync"),
+      q("v_rc").catch(()=>[]), q("v_expected_month").catch(()=>[]), q("v_holding_reserve").catch(()=>[])
     ]);
-    pots = potRows.sort((a,b)=>POT_ORDER.indexOf(a.id)-POT_ORDER.indexOf(b.id));
-    tx = txRows;
-    renderWeek(); renderMonth(); renderProjects(projects); renderTiles(tiles); renderReview(review); renderRecent(recent); renderSync(sync[0]);
+    allPots = potRows;
+    pots = potRows.filter(p=>(p.scope||"prive")==="prive").sort((a,b)=>POT_ORDER.indexOf(a.id)-POT_ORDER.indexOf(b.id));
+    const hp = potRows.filter(p=>p.scope==="holding").sort((a,b)=>a.sort_order-b.sort_order);
+    const isH = (r)=>r.account_role==="holding";
+    tx = txRows.filter(r=>!isH(r));
+    const htx = txRows.filter(isH);
+    renderWeek(); renderMonth(); renderProjects(projects); renderTiles(tiles);
+    renderReview(review.filter(r=>!isH(r))); renderRecent(recent.filter(r=>!isH(r))); renderSync(sync[0]);
+    renderRC(rc[0]); renderExpected(expected); renderReserve(reserve[0]); renderHoldingMonth(htx, hp);
+    renderHList("#h-review", review.filter(isH), "Alles is ingedeeld."); $("#h-review-title").textContent = review.filter(isH).length ? `Nog in te delen (${review.filter(isH).length})` : "Nog in te delen";
+    renderHList("#h-recent", recent.filter(isH), "Nog geen mutaties van de holding. Koppel de zakelijke rekening met connect_bank.py \"ING\" business.");
+    setView(view);
   }catch(e){ console.error(e); toast(/JWT|permission|denied|row-level/i.test(e.message||"") ? "Geen toegang: ingelogd met het juiste e-mailadres?" : "Laden mislukt: "+(e.message||e)); }
 }
 
@@ -331,7 +402,7 @@ function renderTiles(rows){
 
 function txRow(t){
   const neg = Number(t.amount)<0;
-  return `<div class="tx" data-id="${t.id}" data-name="${esc(t.counterparty_name||t.description||"")}" data-amount="${t.amount}" data-date="${t.booking_date}" data-pot="${t.pot_id||""}">
+  return `<div class="tx" data-id="${t.id}" data-name="${esc(t.counterparty_name||t.description||"")}" data-amount="${t.amount}" data-date="${t.booking_date}" data-pot="${t.pot_id||""}" data-scope="${t.account_role==="holding"?"holding":"prive"}">
     <div class="n">${esc(t.counterparty_name || (t.description||"").slice(0,40) || "onbekend")}</div>
     <div class="a num ${neg?"":"in"}">${neg?"−":"+"}${eur2(Math.abs(Number(t.amount)))}</div>
     <div class="d">${dateNL(t.booking_date)}${t.account_name?` · ${esc(t.account_name)}`:""}${t.status==="PDNG"?` <span class="pill">in behandeling</span>`:""}</div>
@@ -349,17 +420,52 @@ function renderRecent(rows){
 }
 function bindTx(sel){ document.querySelectorAll(sel+" .tx").forEach(el=>el.addEventListener("click",()=>openPicker(el.dataset, sel.startsWith("#sheet")))); }
 
+/* holding */
+function renderRC(r){
+  if (!r){ $("#rc-now").textContent="–"; return; }
+  $("#rc-now").textContent = eur(Number(r.stand_nu));
+  $("#rc-sub").textContent = `stand ${dateNL(r.as_of)}: ${eur(Number(r.stand_begin))} · sindsdien ${eur(Number(r.opgenomen))} opgenomen, ${eur(Number(r.terugbetaald))} terug` + (r.interest_pct?` · rente ${r.interest_pct}%`:"");
+}
+$("#f-rc").addEventListener("submit", async (e)=>{
+  e.preventDefault();
+  const { error } = await sb.from("rc_balance").insert({ as_of:$("#rc-date").value, amount:Number($("#rc-amount").value), interest_pct:$("#rc-pct").value?Number($("#rc-pct").value):null, note:$("#rc-note").value||null });
+  toast(error ? "Opslaan mislukt: "+error.message : "Stand opgeslagen"); if (!error){ e.target.reset(); load(); }
+});
+function renderExpected(rows){
+  $("#expected").innerHTML = rows.length ? rows.map(r=>`<div class="chk ${r.status}"><i></i><div><div class="l">${esc(r.label)}</div><div class="s">${r.status==="open" ? (r.day_of_month?`verwacht rond de ${r.day_of_month}e`:"nog niet gezien") : `${dateNL(r.gezien_op)} · ${eur2(Math.abs(Number(r.gezien_bedrag)))}${r.status==="afwijkend"?" · wijkt af van "+eur(Number(r.expected_amount)):""}`}</div></div><div class="r">${r.status==="open"?"open":r.status==="afwijkend"?"check":"✓"}</div></div>`).join("") : `<div class="empty">Geen verwachte posten ingesteld.</div>`;
+}
+function renderReserve(r){
+  if (!r){ $("#reserve").innerHTML=""; return; }
+  $("#reserve").innerHTML = `
+    <div class="tile"><div class="k">Btw dit kwartaal</div><div class="v num">${eur(Number(r.btw_kwartaal_te_betalen))}</div><div class="s">21% over omzet min voorbelasting op kosten</div></div>
+    <div class="tile"><div class="k">Vpb dit jaar (schatting)</div><div class="v num">${eur(Number(r.vpb_jaar_schatting))}</div><div class="s">winst ≈ ${eur(Number(r.winst_jaar_schatting))}; ${eur(Number(r.vpb_betaald))} al betaald</div></div>
+    <div class="tile"><div class="k">Omzet dit jaar (ex btw)</div><div class="v num">${eur(Number(r.omzet_jaar_ex))}</div><div class="s">sinds 1 januari, uit de bank</div></div>
+    <div class="tile"><div class="k">Loonkosten dit jaar</div><div class="v num">${eur(Number(r.loonkosten_jaar))}</div><div class="s">nettoloon + loonheffing</div></div>`;
+}
+function renderHoldingMonth(htx, hp){
+  const [ms, me] = monthRange();
+  const by = {}; for (const t of htx) if (t.booking_date>=ms && t.booking_date<=me) by[t.pot_id]=(by[t.pot_id]||0)+Number(t.amount);
+  $("#h-month-title").textContent = new Date().toLocaleDateString("nl-NL",{month:"long"}).replace(/^./,c=>c.toUpperCase()) + " per post";
+  const rows = hp.filter(p=>by[p.id]);
+  $("#h-pots-month").innerHTML = rows.length ? rows.map(p=>`<div class="row" data-hpot="${p.id}"><div class="l">${esc(p.label)}</div><div class="r num" style="${by[p.id]>0?"color:var(--ok)":""}">${by[p.id]>0?"+":"−"}${eur(Math.abs(by[p.id]))}</div></div>`).join("") : `<div class="empty">Nog geen mutaties deze maand.</div>`;
+  document.querySelectorAll("#h-pots-month .row").forEach(el=>el.addEventListener("click",()=>openPot(el.dataset.hpot, false, htx)));
+}
+function renderHList(sel, rows, emptyText){
+  $(sel).innerHTML = rows.length ? rows.map(txRow).join("") : `<div class="empty">${emptyText}</div>`;
+  bindTx(sel);
+}
+
 /* sheets */
 let current = null, potView = null;
 function openSheet(){ $("#sheet-bg").classList.add("open"); }
 function closeSheet(){ $("#sheet-bg").classList.remove("open"); potView=null; }
 $("#sheet-bg").addEventListener("click",(e)=>{ if (e.target.id==="sheet-bg") closeSheet(); });
-$("#sheet-back").addEventListener("click", ()=>{ if (potView) openPot(potView.id, potView.all); });
+$("#sheet-back").addEventListener("click", ()=>{ if (potView) openPot(potView.id, potView.all, potView.source); });
 
-function openPot(potId, all=false){
-  potView = {id:potId, all};
+function openPot(potId, all=false, source=null){
+  potView = {id:potId, all, source};
   const [ms, me] = monthRange();
-  const rows = tx.filter(t=>t.pot_id===potId && (all || (t.booking_date>=ms && t.booking_date<=me))).sort((a,b)=>b.booking_date.localeCompare(a.booking_date));
+  const rows = (source||tx).filter(t=>t.pot_id===potId && (all || (t.booking_date>=ms && t.booking_date<=me))).sort((a,b)=>b.booking_date.localeCompare(a.booking_date));
   const total = rows.reduce((s,t)=>s-Number(t.amount),0);
   $("#sheet-back").classList.add("hidden");
   $("#sheet-title").innerHTML = `${esc(potLabel(potId))}<small>${all?"alles":"deze maand"} · ${eur(total)}</small>`;
@@ -373,7 +479,8 @@ function openPicker(d, fromPot=false){
   $("#sheet-back").classList.toggle("hidden", !fromPot);
   $("#sheet-title").textContent = d.name || "Transactie";
   $("#sheet-meta").textContent = `${dateNL(d.date)} · ${eur2(Number(d.amount))} · nu: ${potLabel(d.pot)}`;
-  $("#sheet-body").innerHTML = `<div class="pots">${pots.map(p=>`<button type="button" data-pot="${p.id}" class="${p.id===d.pot?"sel":""}">${esc(p.label)}</button>`).join("")}</div>`;
+  const choices = allPots.filter(p=>(p.scope||"prive")===(d.scope||"prive")).sort((a,b)=>(d.scope==="holding"?a.sort_order-b.sort_order:POT_ORDER.indexOf(a.id)-POT_ORDER.indexOf(b.id)));
+  $("#sheet-body").innerHTML = `<div class="pots">${choices.map(p=>`<button type="button" data-pot="${p.id}" class="${p.id===d.pot?"sel":""}">${esc(p.label)}</button>`).join("")}</div>`;
   $("#sheet-body").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>setPot(b.dataset.pot)));
   openSheet();
 }
