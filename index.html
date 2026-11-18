@@ -147,7 +147,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v4.0</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v4.1</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -424,7 +424,7 @@ function bindTx(sel){ document.querySelectorAll(sel+" .tx").forEach(el=>el.addEv
 function renderRC(r){
   if (!r){ $("#rc-now").textContent="–"; return; }
   $("#rc-now").textContent = eur(Number(r.stand_nu));
-  $("#rc-sub").textContent = `stand ${dateNL(r.as_of)}: ${eur(Number(r.stand_begin))} · sindsdien ${eur(Number(r.opgenomen))} opgenomen, ${eur(Number(r.terugbetaald))} terug` + (r.interest_pct?` · rente ${r.interest_pct}%`:"");
+  $("#rc-sub").textContent = `stand ${dateNL(r.as_of)}: ${eur(Number(r.stand_begin))} · sindsdien ${eur(Number(r.opgenomen))} naar privé, waarvan ${eur(Number(r.loon_verrekend||0))} loon, ${eur(Number(r.terugbetaald))} terug` + (r.interest_pct?` · rente ${r.interest_pct}%`:"");
 }
 $("#f-rc").addEventListener("submit", async (e)=>{
   e.preventDefault();
