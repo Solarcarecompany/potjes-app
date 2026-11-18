@@ -119,6 +119,12 @@
   .chk.ok i{background:var(--ok);border-color:var(--ok)} .chk.afwijkend i{background:var(--warn);border-color:var(--warn)}
   .chk .l{font-weight:500} .chk .s{color:var(--mute);font-size:13px}
   .chk .r{text-align:right;font-size:13px;color:var(--ink-2)}
+  .hnav{display:flex;align-items:center;gap:8px;margin:4px 0 10px}
+  .hnav button{background:var(--card);border:0;width:34px;height:34px;border-radius:50%;font-size:18px;cursor:pointer;color:var(--ink)}
+  .hnav .lbl{flex:1;text-align:center;font-weight:500}
+  .hnav .seg{display:flex;background:var(--card);border-radius:9px;padding:3px}
+  .hnav .seg button{width:auto;height:auto;border-radius:7px;font:inherit;font-size:13px;padding:5px 10px;background:none;color:var(--ink-2)}
+  .hnav .seg button.on{background:var(--ink);color:#fff}
   .hidden{display:none}
   @media (prefers-reduced-motion:reduce){.jar .fill,.toast{transition:none}}
 </style>
@@ -147,7 +153,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v4.2</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v4.3</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -179,7 +185,15 @@
     <h2>Opzij te zetten (schatting, geen boekhouding)</h2>
     <div class="tiles" id="reserve"></div>
 
-    <h2 id="h-month-title">Deze maand per post</h2>
+    <h2>Hoe sta ik ervoor</h2>
+    <div class="hnav">
+      <button id="h-prev" type="button" aria-label="vorige">‹</button>
+      <span class="lbl" id="h-period">november 2026</span>
+      <button id="h-next" type="button" aria-label="volgende">›</button>
+      <div class="seg"><button id="h-mode-m" class="on" type="button">Maand</button><button id="h-mode-y" type="button">Jaar</button></div>
+    </div>
+    <div class="tiles" id="h-tiles"></div>
+    <h2 id="h-month-title">Per post</h2>
     <div class="card" id="h-pots-month"></div>
 
     <h2 id="h-review-title">Nog in te delen</h2>
@@ -254,7 +268,7 @@ const ls = { get:(k)=>{try{return localStorage.getItem(k)}catch{return null}}, s
 const esc = (s) => String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
 
 if (SUPABASE_KEY.startsWith("__")) SUPABASE_KEY = ls.get("potjes.key") || "";
-let HTX = []; let sb = null, pots = [], allPots = [], tx = [], weekOffset = 0, view = (location.hash==="#holding"?"holding":"prive"), accountRole = {};
+let HTX = [], HP = [], hMode = "m", hOff = 0; let sb = null, pots = [], allPots = [], tx = [], weekOffset = 0, view = (location.hash==="#holding"?"holding":"prive"), accountRole = {};
 const potLabel = (id)=> (allPots.find(p=>p.id===id)||{}).label || id || "kies potje";
 
 function show(id){ for (const s of ["login","setup","app"]) $("#"+s).classList.toggle("hidden", s!==id); }
@@ -294,16 +308,16 @@ async function q(view, opts={}){
 
 async function load(){
   try{
-    const [potRows, txRows, projects, tiles, review, recent, sync, rc, expected, reserve] = await Promise.all([
+    const [potRows, txRows, projects, tiles, review, recent, sync, rc, expected, reserve, holdingTx] = await Promise.all([
       q("pots"), q("v_leefgeld_tx"), q("v_projecten"), q("v_spaarpotjes"), q("v_te_beoordelen",{limit:60}), q("v_recent",{limit:80}), q("v_sync"),
-      q("v_rc").catch(()=>[]), q("v_expected_month").catch(()=>[]), q("v_holding_reserve").catch(()=>[])
+      q("v_rc").catch(()=>[]), q("v_expected_month").catch(()=>[]), q("v_holding_reserve").catch(()=>[]), q("v_holding_tx").catch(()=>[])
     ]);
     allPots = potRows;
     pots = potRows.filter(p=>(p.scope||"prive")==="prive").sort((a,b)=>POT_ORDER.indexOf(a.id)-POT_ORDER.indexOf(b.id));
     const hp = potRows.filter(p=>p.scope==="holding").sort((a,b)=>a.sort_order-b.sort_order);
     const isH = (r)=>r.account_role==="holding";
     tx = txRows.filter(r=>!isH(r));
-    const htx = txRows.filter(isH); HTX = htx;
+    const htx = holdingTx; HTX = htx; HP = hp;
     renderWeek(); renderMonth(); renderProjects(projects); renderTiles(tiles);
     renderReview(review.filter(r=>!isH(r))); renderRecent(recent.filter(r=>!isH(r))); renderSync(sync[0]);
     renderRC(rc[0]); renderExpected(expected); renderReserve(reserve[0]); renderHoldingMonth(htx, hp);
@@ -432,7 +446,7 @@ $("#f-rc").addEventListener("submit", async (e)=>{
   toast(error ? "Opslaan mislukt: "+error.message : "Stand opgeslagen"); if (!error){ e.target.reset(); load(); }
 });
 function renderExpected(rows){
-  $("#expected").innerHTML = rows.length ? rows.map(r=>`<div class="chk ${r.status}" data-epot="${r.pot_id||""}" style="cursor:pointer"><i></i><div><div class="l">${esc(r.label)}</div><div class="s">${r.status==="open" ? (r.day_of_month?`verwacht rond de ${r.day_of_month}e`:"nog niet gezien") : `${dateNL(r.gezien_op)} · ${eur2(Math.abs(Number(r.gezien_bedrag)))}${r.status==="afwijkend"?" · wijkt af van "+eur(Number(r.expected_amount)):""}`}</div></div><div class="r">${r.status==="open"?"open":r.status==="afwijkend"?"check":"✓"}</div></div>`).join("") : `<div class="empty">Geen verwachte posten ingesteld.</div>`;
+  $("#expected").innerHTML = rows.length ? rows.map(r=>`<div class="chk ${r.status}" data-epot="${r.pot_id||""}" style="cursor:pointer"><i></i><div><div class="l">${esc(r.label)}</div><div class="s">${r.status==="open" ? (r.day_of_month?`verwacht rond de ${r.day_of_month}e`:"nog niet gezien") : `${r.aantal>1?r.aantal+"× · ":""}laatste ${dateNL(r.gezien_op)} · ${eur2(Math.abs(Number(r.gezien_bedrag)))}${r.status==="afwijkend"?" · wijkt af van "+eur(Number(r.expected_amount)):""}`}</div></div><div class="r">${r.status==="open"?"open":r.status==="afwijkend"?"check":"✓"}</div></div>`).join("") : `<div class="empty">Geen verwachte posten ingesteld.</div>`;
 }
 function renderReserve(r){
   if (!r){ $("#reserve").innerHTML=""; return; }
@@ -443,14 +457,40 @@ function renderReserve(r){
     <div class="tile"><div class="k">Omzet ${sinds} (ex btw)</div><div class="v num">${eur(Number(r.omzet_jaar_ex))}</div><div class="s">uit de bank, geen boekhouding</div></div>
     <div class="tile"><div class="k">Loonkosten ${sinds}</div><div class="v num">${eur(Number(r.loonkosten_jaar))}</div><div class="s">${eur(Number(r.nettoloon_jaar))} netto (€4.450/mnd gerekend) + ${eur(Number(r.loonheffing_jaar))} loonheffing</div></div>`;
 }
-function renderHoldingMonth(htx, hp){
-  const [ms, me] = monthRange();
-  const by = {}; for (const t of htx) if (t.booking_date>=ms && t.booking_date<=me) by[t.pot_id]=(by[t.pot_id]||0)+Number(t.amount);
-  $("#h-month-title").textContent = new Date().toLocaleDateString("nl-NL",{month:"long"}).replace(/^./,c=>c.toUpperCase()) + " per post";
-  const rows = hp.filter(p=>by[p.id]);
-  $("#h-pots-month").innerHTML = rows.length ? rows.map(p=>`<div class="row" data-hpot="${p.id}"><div class="l">${esc(p.label)}</div><div class="r num" style="${by[p.id]>0?"color:var(--ok)":""}">${by[p.id]>0?"+":"−"}${eur(Math.abs(by[p.id]))}</div></div>`).join("") : `<div class="empty">Nog geen mutaties deze maand.</div>`;
-  document.querySelectorAll("#h-pots-month .row").forEach(el=>el.addEventListener("click",()=>openPot(el.dataset.hpot, false, htx)));
+function hRange(){
+  const n=new Date();
+  if (hMode==="y"){ const y=n.getFullYear()+hOff; return [`${y}-01-01`, `${y}-12-31`, String(y)]; }
+  const d=new Date(n.getFullYear(), n.getMonth()+hOff, 1), e=new Date(d.getFullYear(), d.getMonth()+1, 0);
+  return [iso(d), iso(e), d.toLocaleDateString("nl-NL",{month:"long",year:"numeric"})];
 }
+function renderHoldingMonth(htx, hp){
+  const [ps, pe, label] = hRange();
+  $("#h-period").textContent = label;
+  const rows = htx.filter(t=>t.booking_date>=ps && t.booking_date<=pe);
+  const by = {}; for (const t of rows) by[t.pot_id]=(by[t.pot_id]||0)+Number(t.amount);
+  const sum = (f)=>rows.filter(f).reduce((a,t)=>a+Number(t.amount),0);
+  const binnen = sum(t=>t.pot_id==="h_omzet"), prive = -sum(t=>t.pot_id==="h_rc"||t.pot_id==="h_loon");
+  const belasting = -sum(t=>["h_loonheffing","h_btw","h_vpb"].includes(t.pot_id));
+  const kosten = -sum(t=>["h_boekhouder","h_kosten","h_verzekering","h_inkoop"].includes(t.pot_id));
+  const beleg = -sum(t=>t.pot_id==="h_belegging"||t.pot_id==="h_deelneming");
+  const loonPot = (allPots.find(p=>p.id==="h_loon")||{}).budget_month||4450;
+  const months = hMode==="y" ? (hOff<0?12:new Date().getMonth()+1) : 1;
+  const loon = loonPot*months, rc = prive-loon;
+  $("#h-tiles").innerHTML = `
+    <div class="tile"><div class="k">Managementfee binnen</div><div class="v num" style="color:var(--ok)">${eur(binnen)}</div><div class="s">${rows.filter(t=>t.pot_id==="h_omzet").length}× ontvangen</div></div>
+    <div class="tile"><div class="k">Naar privé</div><div class="v num">${eur(prive)}</div><div class="s">loon ${eur(loon)} · rekening-courant ${rc>=0?"+":"−"}${eur(Math.abs(rc))}</div></div>
+    <div class="tile"><div class="k">Belastingen betaald</div><div class="v num">${eur(belasting)}</div><div class="s">loonheffing, btw, vpb</div></div>
+    <div class="tile"><div class="k">Kosten</div><div class="v num">${eur(kosten)}</div><div class="s">boekhouder, telefoon, aankopen, bank</div></div>
+    ${beleg ? `<div class="tile"><div class="k">Belegd / gestort</div><div class="v num">${eur(beleg)}</div><div class="s">bitcoin, deelneming</div></div>` : ""}
+    <div class="tile"><div class="k">Saldo-effect</div><div class="v num" style="${binnen-prive-belasting-kosten-beleg<0?"color:var(--warn)":""}">${eur(binnen-prive-belasting-kosten-beleg)}</div><div class="s">binnen min alles eruit</div></div>`;
+  const list = hp.filter(p=>by[p.id]);
+  $("#h-pots-month").innerHTML = list.length ? list.map(p=>`<div class="row" data-hpot="${p.id}"><div class="l">${esc(p.label)}<div class="s" style="color:var(--mute);font-size:12px">${rows.filter(t=>t.pot_id===p.id).length}×</div></div><div class="r num" style="${by[p.id]>0?"color:var(--ok)":""}">${by[p.id]>0?"+":"−"}${eur(Math.abs(by[p.id]))}</div></div>`).join("") : `<div class="empty">Geen mutaties in deze periode.</div>`;
+  document.querySelectorAll("#h-pots-month .row").forEach(el=>el.addEventListener("click",()=>openPot(el.dataset.hpot, true, rows)));
+}
+$("#h-prev").addEventListener("click", ()=>{ hOff--; renderHoldingMonth(HTX, HP); });
+$("#h-next").addEventListener("click", ()=>{ if (hOff<0){ hOff++; renderHoldingMonth(HTX, HP); } });
+$("#h-mode-m").addEventListener("click", ()=>{ hMode="m"; hOff=0; $("#h-mode-m").classList.add("on"); $("#h-mode-y").classList.remove("on"); renderHoldingMonth(HTX, HP); });
+$("#h-mode-y").addEventListener("click", ()=>{ hMode="y"; hOff=0; $("#h-mode-y").classList.add("on"); $("#h-mode-m").classList.remove("on"); renderHoldingMonth(HTX, HP); });
 function renderHList(sel, rows, emptyText){
   $(sel).innerHTML = rows.length ? rows.map(txRow).join("") : `<div class="empty">${emptyText}</div>`;
   bindTx(sel);
