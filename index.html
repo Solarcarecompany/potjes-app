@@ -159,7 +159,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v5.5</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v5.6</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -329,7 +329,7 @@ async function load(){
   try{
     const [potRows, txRows, projects, tiles, review, recent, sync, rc, expected, reserve, holdingTx, bonCats, bonnen, bonItems, vaak, bonus] = await Promise.all([
       q("pots"), q("v_leefgeld_tx"), q("v_projecten"), q("v_spaarpotjes"), q("v_te_beoordelen",{limit:60}), q("v_recent",{limit:80}), q("v_sync"),
-      q("v_rc").catch(()=>[]), q("v_expected_month").catch(()=>[]), q("v_holding_reserve").catch(()=>[]), q("v_holding_tx").catch(()=>[]), q("v_bon_categorie").catch(()=>[]), q("v_bonnen",{limit:12}).catch(()=>[]), q("v_bon_items").catch(()=>[]), q("v_vaak_gekocht",{limit:25}).catch(()=>[]), q("v_bonus_week").catch(()=>[])
+      q("v_rc").catch(()=>[]), q("v_expected_month").catch(()=>[]), q("v_holding_reserve").catch(()=>[]), q("v_holding_tx").catch(()=>[]), q("v_bon_categorie").catch(()=>[]), q("v_bonnen",{limit:30}).catch(()=>[]), q("v_bon_items").catch(()=>[]), q("v_vaak_gekocht",{limit:25}).catch(()=>[]), q("v_bonus_week").catch(()=>[])
     ]);
     allPots = potRows;
     pots = potRows.filter(p=>(p.scope||"prive")==="prive").sort((a,b)=>POT_ORDER.indexOf(a.id)-POT_ORDER.indexOf(b.id));
@@ -501,10 +501,12 @@ function renderBonnen(cats, bonnen){
   $("#bon-cats").innerHTML = rows.length ? rows.map(c=>`<div class="cat" data-cat="${c.category}" style="cursor:pointer"><div>${esc(CAT_LABEL[c.category]||c.category)} <span style="color:var(--mute);font-size:12px">${c.regels}×</span></div><div class="num">${eur2(Number(c.bedrag))}</div><div class="bar"><i style="width:${Math.max(0,Number(c.bedrag))/max*100}%"></i></div></div>`).join("")
     : `<div class="empty">Nog geen bonnen deze maand. Voeg er een toe, dan zie je waar het boodschappengeld heen gaat.</div>`;
   document.querySelectorAll("#bon-cats .cat[data-cat]").forEach(el=>el.addEventListener("click",()=>openItems(el.dataset.cat, ms)));
-  $("#bon-list").innerHTML = bonnen.length ? bonnen.map(b=>`<div class="bon"><div>${esc(b.store||"bon")} · ${b.receipt_date?dateNL(b.receipt_date):dateNL(b.created_at.slice(0,10))}</div><div class="num">${b.total?eur2(Number(b.total)):""}</div><div class="s">${b.status==="verwerkt"?bonCheck(b):b.status==="fout"?"mislukt: "+esc(b.error||""):"wordt verwerkt…"} · <a href="#" data-reparse="${b.id}" style="color:var(--ink-2)">opnieuw lezen</a></div></div>`).join("") : "";
+  $("#bon-list").innerHTML = (bonnen.length ? `<div class="s" style="color:var(--mute);font-size:12px;padding:4px 0 6px">${bonnen.length} bonnen, laatst toegevoegd bovenaan</div>` : "") + (bonnen.length ? bonnen.map(b=>`<div class="bon"><div>${esc(b.store||"bon")} · ${b.receipt_date?dateNL(b.receipt_date):dateNL(b.created_at.slice(0,10))}</div><div class="num">${b.total?eur2(Number(b.total)):""}</div><div class="s">${b.status==="verwerkt"?bonCheck(b):b.status==="fout"?"mislukt: "+esc(b.error||""):"wordt verwerkt…"} · <a href="#" data-reparse="${b.id}" style="color:var(--ink-2)">opnieuw lezen</a> · <a href="#" data-delbon="${b.id}" style="color:var(--mute)">weg</a></div></div>`).join("") : "");
 }
 $("#bon-upload").addEventListener("click", ()=>$("#bon-file").click());
 $("#bon-list").addEventListener("click", async (e)=>{
+  const d = e.target.closest("[data-delbon]");
+  if (d){ e.preventDefault(); if (!confirm("Deze bon verwijderen?")) return; const { error } = await sb.from("receipts").delete().eq("id", d.dataset.delbon); toast(error?"Mislukt":"Bon verwijderd"); await load(); return; }
   const a = e.target.closest("[data-reparse]"); if (!a) return; e.preventDefault();
   toast("Bon wordt opnieuw gelezen…");
   const { data, error } = await sb.functions.invoke("parse-receipt", { body: { receipt_id: a.dataset.reparse } });
@@ -523,6 +525,7 @@ $("#bon-file").addEventListener("change", async (e)=>{
   toast("Bon wordt gelezen…");
   const { data, error } = await sb.functions.invoke("parse-receipt", { body: { receipt_id: ins.data.id } });
   if (error || data?.error){ toast("Lezen mislukt: "+(error?.message||data?.error)); await load(); return; }
+  if (data.duplicate){ toast(`Deze bon (${dateNL(data.date)} · ${eur2(Number(data.total))}) stond er al`); await load(); return; }
   toast(`${data.store||"Bon"} · ${eur2(Number(data.total||0))} · ${data.items} regels`);
   await load();
 });
