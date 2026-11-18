@@ -155,7 +155,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v4.8</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v4.9</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -395,7 +395,7 @@ function renderProjects(rows){
       <div class="top"><strong>${esc(r.label)}</strong><span class="d">${r.ends_on?`${dateNL(r.ends_on)} · nog ${days} dagen`:""}</span></div>
       <div class="nums">
         <div><div class="k">Uitgegeven</div><div class="v num">${eur(uit)}</div></div>
-        <div><div class="k">Uit holding gehaald</div><div class="v num">${eur(gedekt)}</div></div>
+        <div><div class="k">Bijgeschreven in dit potje</div><div class="v num">${eur(gedekt)}</div></div>
         <div><div class="k">Nog te dekken</div><div class="v num ${nog>0?"bad":""}">${eur(Math.max(0,nog))}</div></div>
       </div>
       <div class="target">${target?`begroting ${eur(target)} · nog ${eur(Math.max(0,target-uit))} ruimte`:"begroting:"} <input type="number" inputmode="numeric" placeholder="bedrag" data-target="${r.id}" value="${target??""}"></div>
