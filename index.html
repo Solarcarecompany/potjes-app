@@ -147,7 +147,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v4.1</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v4.2</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -254,7 +254,7 @@ const ls = { get:(k)=>{try{return localStorage.getItem(k)}catch{return null}}, s
 const esc = (s) => String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
 
 if (SUPABASE_KEY.startsWith("__")) SUPABASE_KEY = ls.get("potjes.key") || "";
-let sb = null, pots = [], allPots = [], tx = [], weekOffset = 0, view = (location.hash==="#holding"?"holding":"prive"), accountRole = {};
+let HTX = []; let sb = null, pots = [], allPots = [], tx = [], weekOffset = 0, view = (location.hash==="#holding"?"holding":"prive"), accountRole = {};
 const potLabel = (id)=> (allPots.find(p=>p.id===id)||{}).label || id || "kies potje";
 
 function show(id){ for (const s of ["login","setup","app"]) $("#"+s).classList.toggle("hidden", s!==id); }
@@ -303,7 +303,7 @@ async function load(){
     const hp = potRows.filter(p=>p.scope==="holding").sort((a,b)=>a.sort_order-b.sort_order);
     const isH = (r)=>r.account_role==="holding";
     tx = txRows.filter(r=>!isH(r));
-    const htx = txRows.filter(isH);
+    const htx = txRows.filter(isH); HTX = htx;
     renderWeek(); renderMonth(); renderProjects(projects); renderTiles(tiles);
     renderReview(review.filter(r=>!isH(r))); renderRecent(recent.filter(r=>!isH(r))); renderSync(sync[0]);
     renderRC(rc[0]); renderExpected(expected); renderReserve(reserve[0]); renderHoldingMonth(htx, hp);
@@ -432,15 +432,16 @@ $("#f-rc").addEventListener("submit", async (e)=>{
   toast(error ? "Opslaan mislukt: "+error.message : "Stand opgeslagen"); if (!error){ e.target.reset(); load(); }
 });
 function renderExpected(rows){
-  $("#expected").innerHTML = rows.length ? rows.map(r=>`<div class="chk ${r.status}"><i></i><div><div class="l">${esc(r.label)}</div><div class="s">${r.status==="open" ? (r.day_of_month?`verwacht rond de ${r.day_of_month}e`:"nog niet gezien") : `${dateNL(r.gezien_op)} · ${eur2(Math.abs(Number(r.gezien_bedrag)))}${r.status==="afwijkend"?" · wijkt af van "+eur(Number(r.expected_amount)):""}`}</div></div><div class="r">${r.status==="open"?"open":r.status==="afwijkend"?"check":"✓"}</div></div>`).join("") : `<div class="empty">Geen verwachte posten ingesteld.</div>`;
+  $("#expected").innerHTML = rows.length ? rows.map(r=>`<div class="chk ${r.status}" data-epot="${r.pot_id||""}" style="cursor:pointer"><i></i><div><div class="l">${esc(r.label)}</div><div class="s">${r.status==="open" ? (r.day_of_month?`verwacht rond de ${r.day_of_month}e`:"nog niet gezien") : `${dateNL(r.gezien_op)} · ${eur2(Math.abs(Number(r.gezien_bedrag)))}${r.status==="afwijkend"?" · wijkt af van "+eur(Number(r.expected_amount)):""}`}</div></div><div class="r">${r.status==="open"?"open":r.status==="afwijkend"?"check":"✓"}</div></div>`).join("") : `<div class="empty">Geen verwachte posten ingesteld.</div>`;
 }
 function renderReserve(r){
   if (!r){ $("#reserve").innerHTML=""; return; }
+  const sinds = r.vanaf ? "sinds "+dateNL(r.vanaf) : "dit jaar";
   $("#reserve").innerHTML = `
     <div class="tile"><div class="k">Btw dit kwartaal</div><div class="v num">${eur(Number(r.btw_kwartaal_te_betalen))}</div><div class="s">21% over omzet min voorbelasting op kosten</div></div>
-    <div class="tile"><div class="k">Vpb dit jaar (schatting)</div><div class="v num">${eur(Number(r.vpb_jaar_schatting))}</div><div class="s">winst ≈ ${eur(Number(r.winst_jaar_schatting))}; ${eur(Number(r.vpb_betaald))} al betaald</div></div>
-    <div class="tile"><div class="k">Omzet dit jaar (ex btw)</div><div class="v num">${eur(Number(r.omzet_jaar_ex))}</div><div class="s">sinds 1 januari, uit de bank</div></div>
-    <div class="tile"><div class="k">Loonkosten dit jaar</div><div class="v num">${eur(Number(r.loonkosten_jaar))}</div><div class="s">nettoloon + loonheffing</div></div>`;
+    <div class="tile"><div class="k">Vpb ${sinds} (schatting)</div><div class="v num">${eur(Number(r.vpb_jaar_schatting))}</div><div class="s">winst ≈ ${eur(Number(r.winst_jaar_schatting))}; ${eur(Number(r.vpb_betaald))} al betaald</div></div>
+    <div class="tile"><div class="k">Omzet ${sinds} (ex btw)</div><div class="v num">${eur(Number(r.omzet_jaar_ex))}</div><div class="s">uit de bank, geen boekhouding</div></div>
+    <div class="tile"><div class="k">Loonkosten ${sinds}</div><div class="v num">${eur(Number(r.loonkosten_jaar))}</div><div class="s">${eur(Number(r.nettoloon_jaar))} netto (€4.450/mnd gerekend) + ${eur(Number(r.loonheffing_jaar))} loonheffing</div></div>`;
 }
 function renderHoldingMonth(htx, hp){
   const [ms, me] = monthRange();
