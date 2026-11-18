@@ -159,7 +159,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v5.4</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v5.5</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -250,6 +250,8 @@
   <h2 id="bon-title">Boodschappen per categorie</h2>
   <div class="card" id="bon-cats"></div>
   <div class="card" id="bon-list" style="margin-top:10px"></div>
+  <h2 id="bonus-title">Deze week in de bonus · van jouw lijst</h2>
+  <div class="card" id="bonus"></div>
   <h2 id="vaak-title" class="hidden">Vaak gekocht</h2>
   <div class="card hidden" id="vaak"></div>
   <button type="button" id="bon-upload" class="recur" style="margin-top:10px">📷 Bon toevoegen (foto of PDF uit de AH-app)</button>
@@ -325,9 +327,9 @@ async function q(view, opts={}){
 
 async function load(){
   try{
-    const [potRows, txRows, projects, tiles, review, recent, sync, rc, expected, reserve, holdingTx, bonCats, bonnen, bonItems, vaak] = await Promise.all([
+    const [potRows, txRows, projects, tiles, review, recent, sync, rc, expected, reserve, holdingTx, bonCats, bonnen, bonItems, vaak, bonus] = await Promise.all([
       q("pots"), q("v_leefgeld_tx"), q("v_projecten"), q("v_spaarpotjes"), q("v_te_beoordelen",{limit:60}), q("v_recent",{limit:80}), q("v_sync"),
-      q("v_rc").catch(()=>[]), q("v_expected_month").catch(()=>[]), q("v_holding_reserve").catch(()=>[]), q("v_holding_tx").catch(()=>[]), q("v_bon_categorie").catch(()=>[]), q("v_bonnen",{limit:12}).catch(()=>[]), q("v_bon_items").catch(()=>[]), q("v_vaak_gekocht",{limit:25}).catch(()=>[])
+      q("v_rc").catch(()=>[]), q("v_expected_month").catch(()=>[]), q("v_holding_reserve").catch(()=>[]), q("v_holding_tx").catch(()=>[]), q("v_bon_categorie").catch(()=>[]), q("v_bonnen",{limit:12}).catch(()=>[]), q("v_bon_items").catch(()=>[]), q("v_vaak_gekocht",{limit:25}).catch(()=>[]), q("v_bonus_week").catch(()=>[])
     ]);
     allPots = potRows;
     pots = potRows.filter(p=>(p.scope||"prive")==="prive").sort((a,b)=>POT_ORDER.indexOf(a.id)-POT_ORDER.indexOf(b.id));
@@ -340,7 +342,7 @@ async function load(){
     renderRC(rc[0]); renderExpected(expected.filter(r=>r.scope==="holding")); renderExpected(expected.filter(r=>r.scope==="prive"), "#expected-prive", "prive"); renderReserve(reserve[0]); renderHoldingMonth(htx, hp);
     renderHList("#h-review", review.filter(isH), "Alles is ingedeeld."); $("#h-review-title").textContent = review.filter(isH).length ? `Nog in te delen (${review.filter(isH).length})` : "Nog in te delen";
     renderHList("#h-recent", recent.filter(isH), "Nog geen mutaties van de holding. Koppel de zakelijke rekening met connect_bank.py \"ING\" business.");
-    BONITEMS = bonItems; renderBonnen(bonCats, bonnen); renderVaak(vaak);
+    BONITEMS = bonItems; renderBonnen(bonCats, bonnen); renderBonus(bonus); renderVaak(vaak);
     setView(view);
   }catch(e){ console.error(e); toast(/JWT|permission|denied|row-level/i.test(e.message||"") ? "Geen toegang: ingelogd met het juiste e-mailadres?" : "Laden mislukt: "+(e.message||e)); }
 }
@@ -474,6 +476,16 @@ function openItems(cat, ms){
   $("#sheet-meta").textContent = `${rows.length} regels op ${new Set(rows.map(i=>i.receipt_id)).size} bonnen`;
   $("#sheet-body").innerHTML = rows.map(i=>`<div class="tx"><div class="n">${esc(i.name)}${Number(i.qty)>1?` <span style="color:var(--mute)">×${Number(i.qty)}</span>`:""}</div><div class="a num">${eur2(Number(i.price))}</div><div class="d">${dateNL(i.datum)} · ${esc(i.store||"")}${Number(i.discount)>0?` · <span style="color:var(--ok)">bonus −${eur2(Number(i.discount))}</span>`:""}</div></div>`).join("");
   openSheet();
+}
+function renderBonus(rows){
+  const inBonus = rows.filter(r=>r.is_bonus), rest = rows.filter(r=>!r.is_bonus);
+  $("#bonus").innerHTML = (rows.length ? (inBonus.length ? inBonus.map(r=>`<div class="bon"><div>${esc(r.ah_title||r.naam)} <span style="color:var(--mute);font-size:12px">${esc(r.ah_unit||"")}</span></div><div class="num"><span style="color:var(--ok)">${eur2(Number(r.current_price))}</span> <s style="color:var(--mute);font-size:12px">${eur2(Number(r.price_before))}</s></div></div>`).join("")
+      : `<div class="empty">Niets van je vaste lijst in de bonus deze week (${rest.length} producten gecheckt).</div>`)
+    : `<div class="empty">Nog niet gecheckt. Elke maandagochtend kijkt de app welke van je vaak gekochte producten in de bonus zijn.</div>`)
+    + `<div style="padding:10px 0 2px"><a href="#" id="bonus-now" style="color:var(--ink-2);font-size:13px">nu checken</a></div>`;
+  $("#bonus-now").addEventListener("click", async (e)=>{ e.preventDefault(); toast("AH-bonus checken…");
+    const { data, error } = await sb.functions.invoke("bonus-check", { body: {} });
+    toast(error || data?.error ? "Mislukt: "+(error?.message||data?.error) : `${data.matched} producten gevonden, ${data.bonus} in de bonus`); await load(); });
 }
 function renderVaak(rows){
   const has = rows && rows.length;
