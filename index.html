@@ -153,7 +153,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v4.5</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v4.6</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -447,6 +447,7 @@ $("#f-rc").addEventListener("submit", async (e)=>{
 });
 function renderExpected(rows){
   $("#expected").innerHTML = rows.length ? rows.map(r=>`<div class="chk ${r.status}" data-epot="${r.pot_id||""}" style="cursor:pointer"><i></i><div><div class="l">${esc(r.label)}</div><div class="s">${r.status==="open" ? (r.day_of_month?`verwacht rond de ${r.day_of_month}e`:"nog niet gezien") : `${r.aantal>1?r.aantal+"× · ":""}laatste ${dateNL(r.gezien_op)} · ${eur2(Math.abs(Number(r.gezien_bedrag)))}${r.status==="afwijkend"?" · wijkt af van "+eur(Number(r.expected_amount)):""}`}</div></div><div class="r">${r.status==="open"?"open":r.status==="afwijkend"?"check":"✓"}</div></div>`).join("") : `<div class="empty">Geen verwachte posten ingesteld.</div>`;
+  document.querySelectorAll("#expected .chk[data-epot]").forEach(el=>el.addEventListener("click",()=>{ if (el.dataset.epot) openPot(el.dataset.epot, false, HTX); }));
 }
 function renderReserve(r){
   if (!r){ $("#reserve").innerHTML=""; return; }
@@ -456,6 +457,10 @@ function renderReserve(r){
     <div class="tile" data-rtile="h_vpb" data-title="Vpb betaald"><div class="k">Vpb ${sinds} (schatting)</div><div class="v num">${eur(Number(r.vpb_jaar_schatting))}</div><div class="s">winst ≈ ${eur(Number(r.winst_jaar_schatting))}; ${eur(Number(r.vpb_betaald))} al betaald via voorlopige aanslag${Number(r.vpb_betaald_ander_jaar)?` (+ ${eur(Number(r.vpb_betaald_ander_jaar))} over een ander jaar)`:""}</div></div>
     <div class="tile" data-rtile="h_omzet" data-title="Omzet"><div class="k">Omzet ${sinds} (ex btw)</div><div class="v num">${eur(Number(r.omzet_jaar_ex))}</div><div class="s">uit de bank${Number(r.correctie_jaar)?`, ${eur(Math.abs(Number(r.correctie_jaar)))} nabetaling 2025 eruit`:""}</div></div>
     <div class="tile" data-rtile="h_loonheffing,h_loon" data-title="Loonheffing"><div class="k">Loonkosten ${sinds}</div><div class="v num">${eur(Number(r.loonkosten_jaar))}</div><div class="s">${eur(Number(r.nettoloon_jaar))} netto (€4.450/mnd gerekend) + ${eur(Number(r.loonheffing_jaar))} loonheffing</div></div>`;
+  document.querySelectorAll("#reserve .tile[data-rtile]").forEach(el=>el.addEventListener("click",()=>{
+    const y = String(new Date().getFullYear());
+    openPot(el.dataset.rtile.split(","), true, HTX.filter(t=>t.booking_date.startsWith(y)), el.dataset.title+" "+y);
+  }));
 }
 function hRange(){
   const n=new Date();
