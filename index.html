@@ -155,7 +155,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v4.11</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v4.12</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -535,7 +535,7 @@ function openPot(potId, all=false, source=null, title=null){
   const rows = (source||tx).filter(t=>ids.includes(t.pot_id) && (all || (t.booking_date>=ms && t.booking_date<=me))).sort((a,b)=>b.booking_date.localeCompare(a.booking_date));
   const total = rows.reduce((s,t)=>s-Number(t.amount),0);
   $("#sheet-back").classList.add("hidden");
-  $("#sheet-title").innerHTML = `${esc(title || potLabel(ids[0]))}<small>${all?(source===tx?"alles":"deze periode"):"deze maand"} · ${eur(Math.abs(total))}</small>`;
+  $("#sheet-title").innerHTML = `${esc(title || potLabel(ids[0]))}<small>${all?(source===tx||!source?"dit jaar en eerder":"deze periode"):"deze maand"} · ${eur(Math.abs(total))}</small>`;
   $("#sheet-meta").textContent = rows.length ? "Tik op een regel om hem te verplaatsen." : "";
   $("#sheet-body").innerHTML = rows.length ? rows.map(txRow).join("") : `<div class="empty">Niets in dit potje${all?"":" deze maand"}.</div>`;
   bindTx("#sheet-body");
