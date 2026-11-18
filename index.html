@@ -159,7 +159,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v5.1</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v5.2</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -457,8 +457,10 @@ const CAT_LABEL = { groente_fruit:"Groente & fruit", vlees_vis_vega:"Vlees, vis,
 function bonCheck(b){
   const tot=Number(b.total||0), som=Number(b.som_regels||0);
   const regelsOk = Math.abs(tot-som)<0.05;
-  const txOk = b.transaction_id && Math.abs(Math.abs(Number(b.tx_bedrag))-tot)<0.02;
+  const paid=Number(b.paid||tot);
+  const txOk = b.transaction_id && Math.abs(Math.abs(Number(b.tx_bedrag))-paid)<0.02;
   const parts = [`${b.regels} regels${regelsOk?" ✓":` ⚠ tellen op tot ${eur2(som)}`}`];
+  if (Math.abs(paid-tot)>0.02) parts.push(`${eur2(tot-paid)} met zegels/kaart`);
   parts.push(b.transaction_id ? `${txOk?"✓":"⚠"} afschrijving ${dateNL(b.tx_datum)} ${eur2(Math.abs(Number(b.tx_bedrag)))}` : "⚠ geen afschrijving gevonden");
   return parts.join(" · ");
 }
