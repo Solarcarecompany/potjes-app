@@ -159,7 +159,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v5.3</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v5.4</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -472,14 +472,14 @@ function openItems(cat, ms){
   potView = null; $("#sheet-back").classList.add("hidden");
   $("#sheet-title").innerHTML = `${esc(CAT_LABEL[cat]||cat)}<small>deze maand · ${eur2(tot)}</small>`;
   $("#sheet-meta").textContent = `${rows.length} regels op ${new Set(rows.map(i=>i.receipt_id)).size} bonnen`;
-  $("#sheet-body").innerHTML = rows.map(i=>`<div class="tx"><div class="n">${esc(i.name)}${Number(i.qty)>1?` <span style="color:var(--mute)">×${Number(i.qty)}</span>`:""}</div><div class="a num">${eur2(Number(i.price))}</div><div class="d">${dateNL(i.datum)} · ${esc(i.store||"")}</div></div>`).join("");
+  $("#sheet-body").innerHTML = rows.map(i=>`<div class="tx"><div class="n">${esc(i.name)}${Number(i.qty)>1?` <span style="color:var(--mute)">×${Number(i.qty)}</span>`:""}</div><div class="a num">${eur2(Number(i.price))}</div><div class="d">${dateNL(i.datum)} · ${esc(i.store||"")}${Number(i.discount)>0?` · <span style="color:var(--ok)">bonus −${eur2(Number(i.discount))}</span>`:""}</div></div>`).join("");
   openSheet();
 }
 function renderVaak(rows){
   const has = rows && rows.length;
   $("#vaak-title").classList.toggle("hidden", !has); $("#vaak").classList.toggle("hidden", !has);
   if (!has) return;
-  $("#vaak").innerHTML = rows.map(r=>`<div class="bon"><div>${esc(r.naam)} <span style="color:var(--mute);font-size:12px">${r.bonnen}× · ${esc(CAT_LABEL[r.category]||r.category)}</span></div><div class="num">${eur2(Number(r.gem_per_stuk))}<span style="color:var(--mute);font-size:12px"> /st</span></div></div>`).join("");
+  $("#vaak").innerHTML = rows.map(r=>`<div class="bon"><div>${esc(r.naam)} <span style="color:var(--mute);font-size:12px">${r.bonnen}×${Number(r.met_bonus)?` · ${r.met_bonus}× bonus`:""} · ${esc(CAT_LABEL[r.category]||r.category)}</span></div><div class="num">${eur2(Number(r.gem_per_stuk))}<span style="color:var(--mute);font-size:12px"> /st</span></div></div>`).join("");
 }
 function renderBonnen(cats, bonnen){
   const [ms] = monthRange();
@@ -489,9 +489,15 @@ function renderBonnen(cats, bonnen){
   $("#bon-cats").innerHTML = rows.length ? rows.map(c=>`<div class="cat" data-cat="${c.category}" style="cursor:pointer"><div>${esc(CAT_LABEL[c.category]||c.category)} <span style="color:var(--mute);font-size:12px">${c.regels}×</span></div><div class="num">${eur2(Number(c.bedrag))}</div><div class="bar"><i style="width:${Math.max(0,Number(c.bedrag))/max*100}%"></i></div></div>`).join("")
     : `<div class="empty">Nog geen bonnen deze maand. Voeg er een toe, dan zie je waar het boodschappengeld heen gaat.</div>`;
   document.querySelectorAll("#bon-cats .cat[data-cat]").forEach(el=>el.addEventListener("click",()=>openItems(el.dataset.cat, ms)));
-  $("#bon-list").innerHTML = bonnen.length ? bonnen.map(b=>`<div class="bon"><div>${esc(b.store||"bon")} · ${b.receipt_date?dateNL(b.receipt_date):dateNL(b.created_at.slice(0,10))}</div><div class="num">${b.total?eur2(Number(b.total)):""}</div><div class="s">${b.status==="verwerkt"?bonCheck(b):b.status==="fout"?"mislukt: "+esc(b.error||""):"wordt verwerkt…"}</div></div>`).join("") : "";
+  $("#bon-list").innerHTML = bonnen.length ? bonnen.map(b=>`<div class="bon"><div>${esc(b.store||"bon")} · ${b.receipt_date?dateNL(b.receipt_date):dateNL(b.created_at.slice(0,10))}</div><div class="num">${b.total?eur2(Number(b.total)):""}</div><div class="s">${b.status==="verwerkt"?bonCheck(b):b.status==="fout"?"mislukt: "+esc(b.error||""):"wordt verwerkt…"} · <a href="#" data-reparse="${b.id}" style="color:var(--ink-2)">opnieuw lezen</a></div></div>`).join("") : "";
 }
 $("#bon-upload").addEventListener("click", ()=>$("#bon-file").click());
+$("#bon-list").addEventListener("click", async (e)=>{
+  const a = e.target.closest("[data-reparse]"); if (!a) return; e.preventDefault();
+  toast("Bon wordt opnieuw gelezen…");
+  const { data, error } = await sb.functions.invoke("parse-receipt", { body: { receipt_id: a.dataset.reparse } });
+  toast(error || data?.error ? "Mislukt: "+(error?.message||data?.error) : `${data.store||"Bon"} · ${data.items} regels`); await load();
+});
 $("#bon-file").addEventListener("change", async (e)=>{
   const f = e.target.files[0]; if (!f) return; e.target.value = "";
   toast("Bon uploaden…");
