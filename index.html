@@ -155,7 +155,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v4.9</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v4.10</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -385,6 +385,16 @@ function renderMonth(){
   document.querySelectorAll("#pots-month .row").forEach(el=>el.addEventListener("click",()=>openPot(el.dataset.pot)));
 }
 
+function rcNote(rows){
+  if (!HTX.length) return "";
+  const y = String(new Date().getFullYear());
+  const yr = HTX.filter(t=>t.booking_date.startsWith(y));
+  const naarPrive = -yr.filter(t=>t.pot_id==="h_rc"||t.pot_id==="h_loon").reduce((a,t)=>a+Number(t.amount),0);
+  const loon = ((allPots.find(p=>p.id==="h_loon")||{}).budget_month||4450) * (new Date().getMonth()+1);
+  const extra = naarPrive - loon;
+  const proj = rows.reduce((a,r)=>a+Number(r.uit)-Number(r.gedekt),0);
+  return `<div class="empty" style="text-align:left">Deze potjes betaal je uit de rekening-courant: dit jaar ${eur(Math.max(0,extra))} bovenop je loon uit de holding gehaald, de potjes kostten samen ${eur(proj)}. Zie tab Holding voor de RC-stand.</div>`;
+}
 function renderProjects(rows){
   if (!rows.length){ $("#proj-title").classList.add("hidden"); $("#projects").innerHTML=""; return; }
   $("#proj-title").classList.remove("hidden"); $("#proj-title").textContent = rows.length===1 ? "Apart potje" : "Aparte potjes";
@@ -394,13 +404,12 @@ function renderProjects(rows){
     return `<div class="proj" data-pot="${r.id}">
       <div class="top"><strong>${esc(r.label)}</strong><span class="d">${r.ends_on?`${dateNL(r.ends_on)} · nog ${days} dagen`:""}</span></div>
       <div class="nums">
-        <div><div class="k">Uitgegeven</div><div class="v num">${eur(uit)}</div></div>
-        <div><div class="k">Bijgeschreven in dit potje</div><div class="v num">${eur(gedekt)}</div></div>
-        <div><div class="k">Nog te dekken</div><div class="v num ${nog>0?"bad":""}">${eur(Math.max(0,nog))}</div></div>
+        <div><div class="k">Uitgegeven (netto)</div><div class="v num">${eur(uit-gedekt)}</div></div>
+        <div><div class="k">${target?"Nog ruimte":"Begroting"}</div><div class="v num ${target&&uit-gedekt>target?"bad":""}">${target?eur(Math.max(0,target-(uit-gedekt))):"–"}</div></div>
       </div>
-      <div class="target">${target?`begroting ${eur(target)} · nog ${eur(Math.max(0,target-uit))} ruimte`:"begroting:"} <input type="number" inputmode="numeric" placeholder="bedrag" data-target="${r.id}" value="${target??""}"></div>
+      <div class="target">begroting: <input type="number" inputmode="numeric" placeholder="bedrag" data-target="${r.id}" value="${target??""}"></div>
     </div>`;
-  }).join("");
+  }).join("") + rcNote(rows);
   document.querySelectorAll(".proj").forEach(el=>el.addEventListener("click",(e)=>{ if (e.target.tagName!=="INPUT") openPot(el.dataset.pot, true); }));
   document.querySelectorAll(".proj input[data-target]").forEach(inp=>inp.addEventListener("change", async ()=>{
     const v = inp.value ? Number(inp.value) : null;
