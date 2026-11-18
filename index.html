@@ -159,7 +159,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v5.2</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v5.3</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -250,6 +250,8 @@
   <h2 id="bon-title">Boodschappen per categorie</h2>
   <div class="card" id="bon-cats"></div>
   <div class="card" id="bon-list" style="margin-top:10px"></div>
+  <h2 id="vaak-title" class="hidden">Vaak gekocht</h2>
+  <div class="card hidden" id="vaak"></div>
   <button type="button" id="bon-upload" class="recur" style="margin-top:10px">📷 Bon toevoegen (foto of PDF uit de AH-app)</button>
   <input type="file" id="bon-file" accept="image/*,application/pdf" capture="environment" class="hidden">
 
@@ -323,9 +325,9 @@ async function q(view, opts={}){
 
 async function load(){
   try{
-    const [potRows, txRows, projects, tiles, review, recent, sync, rc, expected, reserve, holdingTx, bonCats, bonnen] = await Promise.all([
+    const [potRows, txRows, projects, tiles, review, recent, sync, rc, expected, reserve, holdingTx, bonCats, bonnen, bonItems, vaak] = await Promise.all([
       q("pots"), q("v_leefgeld_tx"), q("v_projecten"), q("v_spaarpotjes"), q("v_te_beoordelen",{limit:60}), q("v_recent",{limit:80}), q("v_sync"),
-      q("v_rc").catch(()=>[]), q("v_expected_month").catch(()=>[]), q("v_holding_reserve").catch(()=>[]), q("v_holding_tx").catch(()=>[]), q("v_bon_categorie").catch(()=>[]), q("v_bonnen",{limit:12}).catch(()=>[])
+      q("v_rc").catch(()=>[]), q("v_expected_month").catch(()=>[]), q("v_holding_reserve").catch(()=>[]), q("v_holding_tx").catch(()=>[]), q("v_bon_categorie").catch(()=>[]), q("v_bonnen",{limit:12}).catch(()=>[]), q("v_bon_items").catch(()=>[]), q("v_vaak_gekocht",{limit:25}).catch(()=>[])
     ]);
     allPots = potRows;
     pots = potRows.filter(p=>(p.scope||"prive")==="prive").sort((a,b)=>POT_ORDER.indexOf(a.id)-POT_ORDER.indexOf(b.id));
@@ -338,7 +340,7 @@ async function load(){
     renderRC(rc[0]); renderExpected(expected.filter(r=>r.scope==="holding")); renderExpected(expected.filter(r=>r.scope==="prive"), "#expected-prive", "prive"); renderReserve(reserve[0]); renderHoldingMonth(htx, hp);
     renderHList("#h-review", review.filter(isH), "Alles is ingedeeld."); $("#h-review-title").textContent = review.filter(isH).length ? `Nog in te delen (${review.filter(isH).length})` : "Nog in te delen";
     renderHList("#h-recent", recent.filter(isH), "Nog geen mutaties van de holding. Koppel de zakelijke rekening met connect_bank.py \"ING\" business.");
-    renderBonnen(bonCats, bonnen);
+    BONITEMS = bonItems; renderBonnen(bonCats, bonnen); renderVaak(vaak);
     setView(view);
   }catch(e){ console.error(e); toast(/JWT|permission|denied|row-level/i.test(e.message||"") ? "Geen toegang: ingelogd met het juiste e-mailadres?" : "Laden mislukt: "+(e.message||e)); }
 }
@@ -464,13 +466,29 @@ function bonCheck(b){
   parts.push(b.transaction_id ? `${txOk?"✓":"⚠"} afschrijving ${dateNL(b.tx_datum)} ${eur2(Math.abs(Number(b.tx_bedrag)))}` : "⚠ geen afschrijving gevonden");
   return parts.join(" · ");
 }
+function openItems(cat, ms){
+  const rows = BONITEMS.filter(i=>i.category===cat && i.maand===ms).sort((a,b)=>Number(b.price)-Number(a.price));
+  const tot = rows.reduce((a,i)=>a+Number(i.price),0);
+  potView = null; $("#sheet-back").classList.add("hidden");
+  $("#sheet-title").innerHTML = `${esc(CAT_LABEL[cat]||cat)}<small>deze maand · ${eur2(tot)}</small>`;
+  $("#sheet-meta").textContent = `${rows.length} regels op ${new Set(rows.map(i=>i.receipt_id)).size} bonnen`;
+  $("#sheet-body").innerHTML = rows.map(i=>`<div class="tx"><div class="n">${esc(i.name)}${Number(i.qty)>1?` <span style="color:var(--mute)">×${Number(i.qty)}</span>`:""}</div><div class="a num">${eur2(Number(i.price))}</div><div class="d">${dateNL(i.datum)} · ${esc(i.store||"")}</div></div>`).join("");
+  openSheet();
+}
+function renderVaak(rows){
+  const has = rows && rows.length;
+  $("#vaak-title").classList.toggle("hidden", !has); $("#vaak").classList.toggle("hidden", !has);
+  if (!has) return;
+  $("#vaak").innerHTML = rows.map(r=>`<div class="bon"><div>${esc(r.naam)} <span style="color:var(--mute);font-size:12px">${r.bonnen}× · ${esc(CAT_LABEL[r.category]||r.category)}</span></div><div class="num">${eur2(Number(r.gem_per_stuk))}<span style="color:var(--mute);font-size:12px"> /st</span></div></div>`).join("");
+}
 function renderBonnen(cats, bonnen){
   const [ms] = monthRange();
   const rows = cats.filter(c=>c.maand===ms).sort((a,b)=>Number(b.bedrag)-Number(a.bedrag));
   const tot = rows.reduce((a,c)=>a+Number(c.bedrag),0), max = Math.max(...rows.map(c=>Number(c.bedrag)), 1);
   $("#bon-title").textContent = tot ? `Boodschappen per categorie · ${eur(tot)} op bonnen` : "Boodschappen per categorie";
-  $("#bon-cats").innerHTML = rows.length ? rows.map(c=>`<div class="cat"><div>${esc(CAT_LABEL[c.category]||c.category)} <span style="color:var(--mute);font-size:12px">${c.regels}×</span></div><div class="num">${eur2(Number(c.bedrag))}</div><div class="bar"><i style="width:${Math.max(0,Number(c.bedrag))/max*100}%"></i></div></div>`).join("")
+  $("#bon-cats").innerHTML = rows.length ? rows.map(c=>`<div class="cat" data-cat="${c.category}" style="cursor:pointer"><div>${esc(CAT_LABEL[c.category]||c.category)} <span style="color:var(--mute);font-size:12px">${c.regels}×</span></div><div class="num">${eur2(Number(c.bedrag))}</div><div class="bar"><i style="width:${Math.max(0,Number(c.bedrag))/max*100}%"></i></div></div>`).join("")
     : `<div class="empty">Nog geen bonnen deze maand. Voeg er een toe, dan zie je waar het boodschappengeld heen gaat.</div>`;
+  document.querySelectorAll("#bon-cats .cat[data-cat]").forEach(el=>el.addEventListener("click",()=>openItems(el.dataset.cat, ms)));
   $("#bon-list").innerHTML = bonnen.length ? bonnen.map(b=>`<div class="bon"><div>${esc(b.store||"bon")} · ${b.receipt_date?dateNL(b.receipt_date):dateNL(b.created_at.slice(0,10))}</div><div class="num">${b.total?eur2(Number(b.total)):""}</div><div class="s">${b.status==="verwerkt"?bonCheck(b):b.status==="fout"?"mislukt: "+esc(b.error||""):"wordt verwerkt…"}</div></div>`).join("") : "";
 }
 $("#bon-upload").addEventListener("click", ()=>$("#bon-file").click());
@@ -490,7 +508,7 @@ $("#bon-file").addEventListener("change", async (e)=>{
   toast(`${data.store||"Bon"} · ${eur2(Number(data.total||0))} · ${data.items} regels`);
   await load();
 });
-let pendingTx = null;
+let pendingTx = null, BONITEMS = [];
 function renderRecent(rows){
   $("#recent").innerHTML = rows.length ? rows.map(txRow).join("") : `<div class="empty">Nog niets opgehaald. De sync draait elke 4 uur.</div>`;
   bindTx("#recent");
