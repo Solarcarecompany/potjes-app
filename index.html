@@ -159,7 +159,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v5.0</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v5.1</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -454,6 +454,14 @@ function renderReview(rows){
   bindTx("#review");
 }
 const CAT_LABEL = { groente_fruit:"Groente & fruit", vlees_vis_vega:"Vlees, vis, vega", zuivel_eieren:"Zuivel & eieren", brood:"Brood", droge_waren:"Droge waren", kant_en_klaar:"Kant-en-klaar", diepvries:"Diepvries", snacks_snoep:"Snacks & snoep", dranken:"Frisdrank & sap", alcohol:"Alcohol", koffie_thee:"Koffie & thee", huishoudelijk:"Huishoudelijk", verzorging:"Verzorging", kind:"Kind", huisdier:"Huisdier", non_food:"Non-food", statiegeld_korting:"Statiegeld & korting" };
+function bonCheck(b){
+  const tot=Number(b.total||0), som=Number(b.som_regels||0);
+  const regelsOk = Math.abs(tot-som)<0.05;
+  const txOk = b.transaction_id && Math.abs(Math.abs(Number(b.tx_bedrag))-tot)<0.02;
+  const parts = [`${b.regels} regels${regelsOk?" ✓":` ⚠ tellen op tot ${eur2(som)}`}`];
+  parts.push(b.transaction_id ? `${txOk?"✓":"⚠"} afschrijving ${dateNL(b.tx_datum)} ${eur2(Math.abs(Number(b.tx_bedrag)))}` : "⚠ geen afschrijving gevonden");
+  return parts.join(" · ");
+}
 function renderBonnen(cats, bonnen){
   const [ms] = monthRange();
   const rows = cats.filter(c=>c.maand===ms).sort((a,b)=>Number(b.bedrag)-Number(a.bedrag));
@@ -461,7 +469,7 @@ function renderBonnen(cats, bonnen){
   $("#bon-title").textContent = tot ? `Boodschappen per categorie · ${eur(tot)} op bonnen` : "Boodschappen per categorie";
   $("#bon-cats").innerHTML = rows.length ? rows.map(c=>`<div class="cat"><div>${esc(CAT_LABEL[c.category]||c.category)} <span style="color:var(--mute);font-size:12px">${c.regels}×</span></div><div class="num">${eur2(Number(c.bedrag))}</div><div class="bar"><i style="width:${Math.max(0,Number(c.bedrag))/max*100}%"></i></div></div>`).join("")
     : `<div class="empty">Nog geen bonnen deze maand. Voeg er een toe, dan zie je waar het boodschappengeld heen gaat.</div>`;
-  $("#bon-list").innerHTML = bonnen.length ? bonnen.map(b=>`<div class="bon"><div>${esc(b.store||"bon")} · ${b.receipt_date?dateNL(b.receipt_date):dateNL(b.created_at.slice(0,10))}</div><div class="num">${b.total?eur2(Number(b.total)):""}</div><div class="s">${b.status==="verwerkt"?`${b.regels} regels${b.transaction_id?" · gekoppeld aan afschrijving":" · geen afschrijving gevonden"}`:b.status==="fout"?"mislukt: "+esc(b.error||""):"wordt verwerkt…"}</div></div>`).join("") : "";
+  $("#bon-list").innerHTML = bonnen.length ? bonnen.map(b=>`<div class="bon"><div>${esc(b.store||"bon")} · ${b.receipt_date?dateNL(b.receipt_date):dateNL(b.created_at.slice(0,10))}</div><div class="num">${b.total?eur2(Number(b.total)):""}</div><div class="s">${b.status==="verwerkt"?bonCheck(b):b.status==="fout"?"mislukt: "+esc(b.error||""):"wordt verwerkt…"}</div></div>`).join("") : "";
 }
 $("#bon-upload").addEventListener("click", ()=>$("#bon-file").click());
 $("#bon-file").addEventListener("change", async (e)=>{
