@@ -130,7 +130,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes</h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v3.2</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -251,6 +251,7 @@ function renderSync(s){
 
 const leefgeldPots = () => pots.filter(p=>p.kind==="leefgeld");
 const weekBudget = () => leefgeldPots().reduce((s,p)=>s+Number(p.budget_month||0),0)*12/52;
+function isoWeek(d){ const x=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())); const day=x.getUTCDay()||7; x.setUTCDate(x.getUTCDate()+4-day); const y=new Date(Date.UTC(x.getUTCFullYear(),0,1)); return Math.ceil(((x-y)/864e5+1)/7); }
 function mondayOf(d){ const x=new Date(d); x.setHours(0,0,0,0); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); return x; }
 
 function renderWeek(){
@@ -258,7 +259,7 @@ function renderWeek(){
   const start = mondayOf(today); start.setDate(start.getDate()-7*weekOffset);
   const end = new Date(start); end.setDate(start.getDate()+6);
   const s = iso(start), e = iso(end);
-  const spent = tx.filter(t=>t.kind==="leefgeld" && Number(t.amount)<0 && t.booking_date>=s && t.booking_date<=e).reduce((a,t)=>a-Number(t.amount),0);
+  const spent = tx.filter(t=>t.kind==="leefgeld" && t.booking_date>=s && t.booking_date<=e).reduce((a,t)=>a-Number(t.amount),0);
   const budget = weekBudget(), over = budget - spent;
   const pct = budget>0 ? Math.max(0, Math.min(100, over/budget*100)) : 0;
   const jar = $("#jar"); jar.classList.toggle("low", pct<35 && pct>0); jar.classList.toggle("empty", over<=0);
@@ -266,7 +267,7 @@ function renderWeek(){
   $("#week-over").textContent = (over<0?"−":"")+eur(Math.abs(over));
   const daysLeft = weekOffset===0 ? Math.max(0, Math.round((end-today)/864e5)+1) : 0;
   $("#week-detail").textContent = over<0 ? `${eur(Math.abs(over))} over het weekbudget van ${eur(budget)}` : `over van ${eur(budget)} · ${eur(spent)} uitgegeven` + (daysLeft>0 ? ` · ${eur(over/daysLeft)} per dag` : "");
-  $("#week-range").textContent = (weekOffset===0 ? "deze week · " : weekOffset===1 ? "vorige week · " : "") + `${dateNL(s)} t/m ${dateNL(e)}`;
+  $("#week-range").textContent = `week ${isoWeek(start)} · ${dateNL(s)} t/m ${dateNL(e)}` + (weekOffset===0 ? "" : weekOffset===1 ? " · vorige week" : "");
   $("#w-next").disabled = weekOffset===0;
   const days = $("#days"); days.innerHTML="";
   for (let i=0;i<7;i++){ const d=new Date(start); d.setDate(start.getDate()+i); const el=document.createElement("i"); if (d<today) el.className="past"; if (d.getTime()===today.getTime()) el.className="today"; days.appendChild(el); }
@@ -277,7 +278,7 @@ function monthRange(){ const n=new Date(); const s=new Date(n.getFullYear(),n.ge
 function renderMonth(){
   const [ms, me, daysInMonth, today] = monthRange();
   const inMonth = tx.filter(t=>t.booking_date>=ms && t.booking_date<=me);
-  const spentBy = {}; for (const t of inMonth) if (Number(t.amount)<0) spentBy[t.pot_id]=(spentBy[t.pot_id]||0)-Number(t.amount);
+  const spentBy = {}; for (const t of inMonth) spentBy[t.pot_id]=(spentBy[t.pot_id]||0)-Number(t.amount);
   const lp = leefgeldPots();
   const budget = lp.reduce((s,p)=>s+Number(p.budget_month||0),0);
   const spent = lp.reduce((s,p)=>s+(spentBy[p.id]||0),0);
@@ -359,7 +360,7 @@ function openPot(potId, all=false){
   potView = {id:potId, all};
   const [ms, me] = monthRange();
   const rows = tx.filter(t=>t.pot_id===potId && (all || (t.booking_date>=ms && t.booking_date<=me))).sort((a,b)=>b.booking_date.localeCompare(a.booking_date));
-  const total = rows.reduce((s,t)=>s+(Number(t.amount)<0?-Number(t.amount):0),0);
+  const total = rows.reduce((s,t)=>s-Number(t.amount),0);
   $("#sheet-back").classList.add("hidden");
   $("#sheet-title").innerHTML = `${esc(potLabel(potId))}<small>${all?"alles":"deze maand"} · ${eur(total)}</small>`;
   $("#sheet-meta").textContent = rows.length ? "Tik op een regel om hem te verplaatsen." : "";
