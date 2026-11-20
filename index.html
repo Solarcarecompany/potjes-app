@@ -131,6 +131,9 @@
   .cat .bar{grid-column:1/-1;height:5px;border-radius:3px;background:var(--line);overflow:hidden} .cat .bar i{display:block;height:100%;background:var(--ink)}
   .bon{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px} .bon:last-child{border-bottom:0}
   .bon .s{color:var(--mute);font-size:12px;grid-column:1/-1}
+  details.sec{margin-top:18px} details.sec summary{list-style:none;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-size:13px;color:var(--mute);font-weight:500;padding:0 2px 8px}
+  details.sec summary::-webkit-details-marker{display:none} details.sec summary::before{content:"›";display:inline-block;margin-right:8px;transition:transform .15s;color:var(--mute)} details.sec[open] summary::before{transform:rotate(90deg)}
+  details.sec summary > span:first-child{flex:1} details.sec .sum{font-weight:400}
   .hidden{display:none}
   @media (prefers-reduced-motion:reduce){.jar .fill,.toast{transition:none}}
 </style>
@@ -159,12 +162,14 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v5.6</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v6.0</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
   <div class="tabs" role="tablist">
-    <button type="button" id="tab-prive" class="on" role="tab">Privé</button>
+    <button type="button" id="tab-prive" class="on" role="tab">Week</button>
+    <button type="button" id="tab-potjes" role="tab">Potjes</button>
+    <button type="button" id="tab-bonnen" role="tab">Bonnen</button>
     <button type="button" id="tab-holding" role="tab">Holding</button>
   </div>
 
@@ -205,8 +210,8 @@
     <h2 id="h-review-title">Nog in te delen</h2>
     <div class="card" id="h-review"></div>
 
-    <h2>Laatste mutaties holding</h2>
-    <div class="card" id="h-recent"></div>
+    <details class="sec" data-sec="hrecent"><summary><span>Laatste mutaties holding</span></summary>
+    <div class="card" id="h-recent"></div></details>
   </div>
 
   <div id="view-prive">
@@ -232,33 +237,41 @@
     <div class="tile"><div class="k">Rest van de maand</div><div class="v num" id="m-left">–</div><div class="s" id="m-left-s"></div></div>
   </div>
 
-  <h2>Vaste lasten deze maand</h2>
-  <div class="card" id="expected-prive"></div>
+  <details class="sec" data-sec="vast"><summary><span>Vaste lasten deze maand</span><span class="sum" id="vast-sum"></span></summary>
+  <div class="card" id="expected-prive"></div></details>
 
+  <h2 id="review-title">Nog in te delen</h2>
+  <div class="card" id="review"></div>
+  </div>
+
+  <div id="view-potjes" class="hidden">
   <h2 id="month-title">Deze maand per potje</h2>
   <div class="card" id="pots-month"></div>
 
-  <h2 id="proj-title">Bruiloft</h2>
+  <h2 id="proj-title">Aparte potjes</h2>
   <div id="projects"></div>
 
   <h2>Opzij gezet</h2>
   <div class="tiles" id="tiles"></div>
 
-  <h2 id="review-title">Nog in te delen</h2>
-  <div class="card" id="review"></div>
+  <details class="sec" data-sec="recent"><summary><span>Laatste bij- en afschrijvingen</span></summary>
+  <div class="card" id="recent"></div></details>
+  </div>
 
+  <div id="view-bonnen" class="hidden">
   <h2 id="bon-title">Boodschappen per categorie</h2>
   <div class="card" id="bon-cats"></div>
-  <div class="card" id="bon-list" style="margin-top:10px"></div>
-  <h2 id="bonus-title">Deze week in de bonus · van jouw lijst</h2>
-  <div class="card" id="bonus"></div>
-  <h2 id="vaak-title" class="hidden">Vaak gekocht</h2>
-  <div class="card hidden" id="vaak"></div>
   <button type="button" id="bon-upload" class="recur" style="margin-top:10px">📷 Bon toevoegen (foto of PDF uit de AH-app)</button>
   <input type="file" id="bon-file" accept="image/*,application/pdf" capture="environment" class="hidden">
 
-  <h2>Laatste bij- en afschrijvingen</h2>
-  <div class="card" id="recent"></div>
+  <h2 id="bonus-title">Deze week in de bonus · van jouw lijst</h2>
+  <div class="card" id="bonus"></div>
+
+  <details class="sec" data-sec="vaak"><summary><span id="vaak-title">Vaak gekocht</span></summary>
+  <div class="card" id="vaak"></div></details>
+
+  <details class="sec" data-sec="bonlist"><summary><span>Gescande bonnen</span><span class="sum" id="bon-sum"></span></summary>
+  <div class="card" id="bon-list"></div></details>
   </div>
 </main>
 
@@ -287,7 +300,7 @@ const ls = { get:(k)=>{try{return localStorage.getItem(k)}catch{return null}}, s
 const esc = (s) => String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
 
 if (SUPABASE_KEY.startsWith("__")) SUPABASE_KEY = ls.get("potjes.key") || "";
-let HTX = [], HP = [], hMode = "m", hOff = 0; let sb = null, pots = [], allPots = [], tx = [], weekOffset = 0, view = (location.hash==="#holding"?"holding":"prive"), accountRole = {};
+let HTX = [], HP = [], hMode = "m", hOff = 0; let sb = null, pots = [], allPots = [], tx = [], weekOffset = 0, view = (["potjes","bonnen","holding"].includes(location.hash.slice(1))?location.hash.slice(1):"prive"), accountRole = {};
 const potLabel = (id)=> (allPots.find(p=>p.id===id)||{}).label || id || "kies potje";
 
 function show(id){ for (const s of ["login","setup","app"]) $("#"+s).classList.toggle("hidden", s!==id); }
@@ -308,10 +321,12 @@ $("#f-login").addEventListener("submit", async (e)=>{
   ls.set("potjes.email",email); show("app"); await load();
 });
 $("#refresh").addEventListener("click", load);
-function setView(v){ view=v; $("#view-prive").classList.toggle("hidden", v!=="prive"); $("#view-holding").classList.toggle("hidden", v!=="holding"); $("#tab-prive").classList.toggle("on", v==="prive"); $("#tab-holding").classList.toggle("on", v==="holding"); if (v==="holding") history.replaceState(null,"","#holding"); else history.replaceState(null,""," "); }
-$("#tab-prive").addEventListener("click", ()=>setView("prive"));
-$("#tab-holding").addEventListener("click", ()=>setView("holding"));
-window.addEventListener("hashchange", ()=>setView(location.hash==="#holding"?"holding":"prive"));
+const VIEWS=["prive","potjes","bonnen","holding"];
+function setView(v){ view=v; for (const x of VIEWS){ $("#view-"+x).classList.toggle("hidden", v!==x); $("#tab-"+x).classList.toggle("on", v===x); } history.replaceState(null,"", v==="prive"?" ":"#"+v); }
+for (const x of VIEWS) $("#tab-"+x).addEventListener("click", ()=>setView(x));
+window.addEventListener("hashchange", ()=>setView(VIEWS.includes(location.hash.slice(1))?location.hash.slice(1):"prive"));
+// uitklapstand onthouden
+document.querySelectorAll("details.sec").forEach(d=>{ try{ const st=localStorage.getItem("potjes.sec."+d.dataset.sec); if (st==="1") d.open=true; }catch{}; d.addEventListener("toggle",()=>{ try{ localStorage.setItem("potjes.sec."+d.dataset.sec, d.open?"1":"0"); }catch{} }); });
 $("#logout").addEventListener("click", async ()=>{ await sb.auth.signOut(); show("login"); });
 $("#w-prev").addEventListener("click", ()=>{ weekOffset++; renderWeek(); });
 $("#w-next").addEventListener("click", ()=>{ if (weekOffset>0){ weekOffset--; renderWeek(); } });
@@ -489,8 +504,8 @@ function renderBonus(rows){
 }
 function renderVaak(rows){
   const has = rows && rows.length;
-  $("#vaak-title").classList.toggle("hidden", !has); $("#vaak").classList.toggle("hidden", !has);
-  if (!has) return;
+  $("#vaak-title").textContent = has ? `Vaak gekocht (${rows.length})` : "Vaak gekocht";
+  if (!has){ $("#vaak").innerHTML = `<div class="empty">Nog geen producten die op twee of meer bonnen staan.</div>`; return; }
   $("#vaak").innerHTML = rows.map(r=>`<div class="bon"><div>${esc(r.naam)} <span style="color:var(--mute);font-size:12px">${r.bonnen}×${Number(r.met_bonus)?` · ${r.met_bonus}× bonus`:""} · ${esc(CAT_LABEL[r.category]||r.category)}</span></div><div class="num">${eur2(Number(r.gem_per_stuk))}<span style="color:var(--mute);font-size:12px"> /st</span></div></div>`).join("");
 }
 function renderBonnen(cats, bonnen){
@@ -501,7 +516,8 @@ function renderBonnen(cats, bonnen){
   $("#bon-cats").innerHTML = rows.length ? rows.map(c=>`<div class="cat" data-cat="${c.category}" style="cursor:pointer"><div>${esc(CAT_LABEL[c.category]||c.category)} <span style="color:var(--mute);font-size:12px">${c.regels}×</span></div><div class="num">${eur2(Number(c.bedrag))}</div><div class="bar"><i style="width:${Math.max(0,Number(c.bedrag))/max*100}%"></i></div></div>`).join("")
     : `<div class="empty">Nog geen bonnen deze maand. Voeg er een toe, dan zie je waar het boodschappengeld heen gaat.</div>`;
   document.querySelectorAll("#bon-cats .cat[data-cat]").forEach(el=>el.addEventListener("click",()=>openItems(el.dataset.cat, ms)));
-  $("#bon-list").innerHTML = (bonnen.length ? `<div class="s" style="color:var(--mute);font-size:12px;padding:4px 0 6px">${bonnen.length} bonnen, laatst toegevoegd bovenaan</div>` : "") + (bonnen.length ? bonnen.map(b=>`<div class="bon"><div>${esc(b.store||"bon")} · ${b.receipt_date?dateNL(b.receipt_date):dateNL(b.created_at.slice(0,10))}</div><div class="num">${b.total?eur2(Number(b.total)):""}</div><div class="s">${b.status==="verwerkt"?bonCheck(b):b.status==="fout"?"mislukt: "+esc(b.error||""):"wordt verwerkt…"} · <a href="#" data-reparse="${b.id}" style="color:var(--ink-2)">opnieuw lezen</a> · <a href="#" data-delbon="${b.id}" style="color:var(--mute)">weg</a></div></div>`).join("") : "");
+  $("#bon-sum").textContent = bonnen.length ? `${bonnen.length}` : "";
+  $("#bon-list").innerHTML = (bonnen.length ? bonnen.map(b=>`<div class="bon"><div>${esc(b.store||"bon")} · ${b.receipt_date?dateNL(b.receipt_date):dateNL(b.created_at.slice(0,10))}</div><div class="num">${b.total?eur2(Number(b.total)):""}</div><div class="s">${b.status==="verwerkt"?bonCheck(b):b.status==="fout"?"mislukt: "+esc(b.error||""):"wordt verwerkt…"} · <a href="#" data-reparse="${b.id}" style="color:var(--ink-2)">opnieuw lezen</a> · <a href="#" data-delbon="${b.id}" style="color:var(--mute)">weg</a></div></div>`).join("") : "");
 }
 $("#bon-upload").addEventListener("click", ()=>$("#bon-file").click());
 $("#bon-list").addEventListener("click", async (e)=>{
@@ -548,6 +564,8 @@ $("#f-rc").addEventListener("submit", async (e)=>{
   toast(error ? "Opslaan mislukt: "+error.message : "Stand opgeslagen"); if (!error){ e.target.reset(); load(); }
 });
 function renderExpected(rows, sel="#expected", scope="holding"){
+  if (sel==="#expected-prive"){ const o=rows.filter(r=>r.status==="open").length, a=rows.filter(r=>r.status==="afwijkend"||r.status==="dubbel").length, ok=rows.filter(r=>r.status==="ok").length;
+    $("#vast-sum").textContent = `${ok} ✓${o?` · ${o} open`:""}${a?` · ${a} check`:""}`; }
   const src = scope==="holding" ? ()=>HTX : ()=>tx;
   $(sel).innerHTML = rows.length ? rows.map(r=>`<div class="chk ${r.status}" data-epot="${r.pot_id||""}" data-epat="${esc(r.pattern||"")}" style="cursor:pointer"><i></i><div><div class="l">${esc(r.label)}</div><div class="s">${r.status==="open" ? (r.day_of_month?`verwacht rond de ${r.day_of_month}e`:"nog niet gezien") : `${r.aantal>1?r.aantal+"× · ":""}laatste ${dateNL(r.gezien_op)} · ${eur2(Math.abs(Number(r.gezien_bedrag)))}${r.status==="afwijkend"?" · verwacht "+eur2(Number(r.expected_amount)):""}${r.status==="dubbel"?" · vaker dan verwacht":""}`}</div></div><div class="r">${r.status==="open"?"open":r.status==="deels"?`${r.aantal} van ${r.expected_count}`:r.status==="afwijkend"?"check":r.status==="dubbel"?"dubbel?":"✓"}<span class="x" data-del="${r.id}" title="niet meer verwachten">×</span></div></div>`).join("")
   : `<div class="empty">Geen verwachte posten ingesteld.</div>`;
