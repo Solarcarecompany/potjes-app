@@ -200,7 +200,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v7.3</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v7.4</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -450,9 +450,10 @@ function renderCoach(n){
 let coachBusy = false;
 async function askCoach(silent){
   if (coachBusy) return; coachBusy = true; $("#coach-new").textContent = "bezig…";
+  const prev = $("#coach-body").innerHTML; $("#coach-body").innerHTML = `<div class="empty">Analyse wordt gemaakt, dit duurt ongeveer een halve minuut…</div>`; let done = false;
   try{ const { data, error } = await sb.functions.invoke("coach", { body: {} });
-    if (error || data?.error){ if (!silent) toast("Analyse mislukt: "+(error?.message||data?.error)); } else renderCoach(data);
-  } finally { coachBusy = false; $("#coach-new").textContent = "nieuwe analyse"; }
+    if (error || data?.error){ if (!silent) toast("Analyse mislukt: "+(error?.message||data?.error)); } else { renderCoach(data); done = true; }
+  } finally { if (!done) $("#coach-body").innerHTML = prev; coachBusy = false; $("#coach-new").textContent = "nieuwe analyse"; }
 }
 $("#coach-new").addEventListener("click", (e)=>{ e.preventDefault(); askCoach(false); });
 const ROLE_NAME = { leefgeld:"ING", vaste_lasten:"ABN" };
