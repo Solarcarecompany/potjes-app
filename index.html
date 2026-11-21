@@ -140,6 +140,8 @@
   .hnav button:disabled{opacity:.3}
   .saldo{display:flex;gap:8px;margin-bottom:12px}
   .saldo > div{flex:1;background:var(--card);border-radius:12px;padding:9px 12px}
+  .saldo > div{cursor:pointer} .saldo .f{font-size:12px;margin-top:2px;color:var(--mute)} .saldo .f.warn{color:var(--warn)} .saldo .f.bad{color:var(--bad);font-weight:600}
+  .alert{border-radius:14px;padding:12px 14px;margin-bottom:12px;font-size:14px;color:#fff;background:#A63A27;cursor:pointer} .alert.warn{background:#9A6710} .alert b{display:block;font-size:15px;margin-bottom:2px}
   .saldo .k{font-size:12px;color:var(--mute)} .saldo .v{font-weight:600;font-size:17px;letter-spacing:-.01em}
   .hero{border-radius:18px;padding:16px;color:#fff;background:#1E5E48;transition:background .3s}
   .hero.warn{background:#9A6710} .hero.bad{background:#A63A27}
@@ -190,7 +192,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v7.0</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v7.1</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -246,6 +248,7 @@
 
   <div id="view-prive">
   <div class="saldo" id="saldo"></div>
+  <div id="fc-warn"></div>
 
   <div class="seg3"><button id="d-w" class="on" type="button">Week</button><button id="d-m" type="button">Maand</button><button id="d-y" type="button">Jaar</button></div>
   <div class="hnav">
@@ -388,9 +391,9 @@ async function q(view, opts={}){
 
 async function load(){
   try{
-    const [potRows, txRows, projects, tiles, review, recent, sync, rc, expected, reserve, holdingTx, bonCats, bonnen, bonItems, vaak, bonus, saldo] = await Promise.all([
+    const [potRows, txRows, projects, tiles, review, recent, sync, rc, expected, reserve, holdingTx, bonCats, bonnen, bonItems, vaak, bonus, saldo, flows] = await Promise.all([
       q("pots"), qAll("v_leefgeld_tx"), q("v_projecten"), q("v_spaarpotjes"), q("v_te_beoordelen",{limit:60}), q("v_recent",{limit:80}), q("v_sync"),
-      q("v_rc").catch(()=>[]), q("v_expected_month").catch(()=>[]), q("v_holding_reserve").catch(()=>[]), qAll("v_holding_tx").catch(()=>[]), q("v_bon_categorie").catch(()=>[]), q("v_bonnen",{limit:30}).catch(()=>[]), qAll("v_bon_items","datum").catch(()=>[]), q("v_vaak_gekocht",{limit:25}).catch(()=>[]), q("v_bonus_week").catch(()=>[]), q("v_saldo").catch(()=>[])
+      q("v_rc").catch(()=>[]), q("v_expected_month").catch(()=>[]), q("v_holding_reserve").catch(()=>[]), qAll("v_holding_tx").catch(()=>[]), q("v_bon_categorie").catch(()=>[]), q("v_bonnen",{limit:30}).catch(()=>[]), qAll("v_bon_items","datum").catch(()=>[]), q("v_vaak_gekocht",{limit:25}).catch(()=>[]), q("v_bonus_week").catch(()=>[]), q("v_saldo").catch(()=>[]), q("planned_flows").catch(()=>[])
     ]);
     allPots = potRows;
     pots = potRows.filter(p=>(p.scope||"prive")==="prive").sort((a,b)=>POT_ORDER.indexOf(a.id)-POT_ORDER.indexOf(b.id));
@@ -399,6 +402,7 @@ async function load(){
     tx = txRows.filter(r=>!isH(r));
     const htx = holdingTx; HTX = htx; HP = hp;
     REVIEW = review.filter(r=>!isH(r));
+    FC = forecast(saldo, expected.filter(r=>r.scope==="prive"), flows);
     renderSaldo(saldo); renderDash(); renderMonth(); renderProjects(projects); renderTiles(tiles);
     renderReview(REVIEW); renderRecent(); renderSync(sync[0]);
     renderRC(rc[0]); renderExpected(expected.filter(r=>r.scope==="holding")); renderExpected(expected.filter(r=>r.scope==="prive"), "#expected-prive", "prive"); renderReserve(reserve[0]); renderHoldingMonth(htx, hp);
@@ -421,10 +425,75 @@ const weekBudget = () => leefgeldPots().reduce((s,p)=>s+Number(p.budget_month||0
 function isoWeek(d){ const x=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())); const day=x.getUTCDay()||7; x.setUTCDate(x.getUTCDate()+4-day); const y=new Date(Date.UTC(x.getUTCFullYear(),0,1)); return Math.ceil(((x-y)/864e5+1)/7); }
 function mondayOf(d){ const x=new Date(d); x.setHours(0,0,0,0); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); return x; }
 
+const ROLE_NAME = { leefgeld:"ING", vaste_lasten:"ABN" };
+function forecast(saldo, exp, flows, days=35){
+  const t0 = new Date(); t0.setHours(0,0,0,0); const end = new Date(t0); end.setDate(end.getDate()+days);
+  const ev = [];   // {date, role, amount, label, soft}
+  const add = (d, role, amount, label, soft)=>{ if (role && d>=t0 && d<=end) ev.push({date:new Date(d), role, amount, label, soft:!!soft}); };
+  for (const e of exp){
+    if (!e.expected_amount || !e.day_of_month) continue;
+    for (let k=0;k<3;k++){
+      const m = new Date(t0.getFullYear(), t0.getMonth()+k, 1), last = new Date(m.getFullYear(), m.getMonth()+1, 0).getDate();
+      let d = new Date(m.getFullYear(), m.getMonth(), Math.min(e.day_of_month, last));
+      let n = Number(e.expected_count||1);
+      if (k===0){ n -= Number(e.aantal||0); if (n<=0) continue; if (d<t0) d = new Date(t0); }
+      if (/tot dec 2026/.test(e.label) && m > new Date(2026,11,1)) continue;
+      add(d, e.account_role||"vaste_lasten", -Number(e.expected_amount)*n, e.label);
+    }
+  }
+  for (const f of (flows||[])){
+    if (!f.active) continue; const st = new Date(f.start_date+"T00:00:00");
+    for (let d=new Date(Math.max(t0, st)); d<=end; d.setDate(d.getDate()+1)){
+      const hit = f.kind==="weekly" ? ((d.getDay()+6)%7)+1===f.day : d.getDate()===Math.min(f.day, new Date(d.getFullYear(), d.getMonth()+1, 0).getDate());
+      if (!hit) continue;
+      add(d, f.from_role, -Number(f.amount), f.label); add(d, f.to_role, Number(f.amount), f.label);
+    }
+  }
+  const perDay = weekBudget()/7;
+  for (let d=new Date(t0.getTime()+DAY1); d<=end; d.setDate(d.getDate()+1)) add(d, "leefgeld", -perDay, "leefgeld", true);
+  const out = {};
+  for (const acc of (saldo||[])){
+    if (acc.role==="holding" || acc.balance==null) continue;
+    const list = ev.filter(e=>e.role===acc.role).sort((a,b)=>a.date-b.date || a.amount-b.amount);
+    let bal = Number(acc.balance), min = bal, minDate = t0, firstNeg = null; const rows = [];
+    for (const e of list){ bal += e.amount; rows.push({...e, bal}); if (bal<min){ min=bal; minDate=e.date; } if (bal<0 && !firstNeg) firstNeg = {...e, bal}; }
+    let nextIn = null; if (firstNeg) nextIn = list.find(e=>e.amount>0 && e.date>firstNeg.date) || null;
+    // tekort = diepste punt tot het eerstvolgende geld binnenkomt
+    let need = 0; if (firstNeg){ for (const r of rows){ if (nextIn && r.date>=nextIn.date && r.amount>0) break; need = Math.min(need, r.bal); } }
+    out[acc.role] = { name:acc.name, start:Number(acc.balance), min, minDate, firstNeg, nextIn, need:-need, rows };
+  }
+  return out;
+}
+const DAY1 = 864e5;
 function renderSaldo(rows){
-  const pr = (rows||[]).filter(r=>r.role!=="holding");
   $("#saldo-h").innerHTML = (rows||[]).filter(r=>r.role==="holding").map(r=>`<div><div class="k">Saldo ${esc(r.name)}</div><div class="v num">${r.balance==null?"–":eur(Number(r.balance))}</div></div>`).join("");
-  $("#saldo").innerHTML = pr.map(r=>`<div><div class="k">${esc(r.name)}</div><div class="v num">${r.balance==null?"–":eur(Number(r.balance))}</div></div>`).join("");
+  const pr = (rows||[]).filter(r=>r.role!=="holding");
+  $("#saldo").innerHTML = pr.map(r=>{ const f = FC[r.role]; const cls = !f ? "" : f.min<0 ? "bad" : f.min<100 ? "warn" : "";
+    return `<div data-role="${r.role}"><div class="k">${esc(r.name)}</div><div class="v num">${r.balance==null?"–":eur(Number(r.balance))}</div>${f?`<div class="f ${cls}">laagst ${f.min<0?"−":""}${eur(Math.abs(f.min))} op ${dateNL(iso(f.minDate))}</div>`:""}</div>`; }).join("");
+  document.querySelectorAll("#saldo > div[data-role]").forEach(el=>el.addEventListener("click",()=>openForecast(el.dataset.role)));
+  $("#fc-warn").innerHTML = Object.entries(FC).filter(([,f])=>f.min<100).map(([role,f])=>{
+    const inTxt = f.nextIn ? `Nieuw geld komt pas ${dateNL(iso(f.nextIn.date))} (${esc(f.nextIn.label)}, ${eur(f.nextIn.amount)}).` : "Er staat geen bijschrijving gepland.";
+    if (f.firstNeg && f.firstNeg.soft) return `<div class="alert warn" data-role="${role}"><b>${esc(ROLE_NAME[role]||f.name)} is rond ${dateNL(iso(f.firstNeg.date))} leeg</b>Bij je normale leefgeld van ${eur(weekBudget()/7)} per dag. ${inTxt} Tot dan kom je ongeveer ${eur(f.need)} tekort.</div>`;
+    if (f.firstNeg) return `<div class="alert" data-role="${role}"><b>${esc(ROLE_NAME[role]||f.name)} komt ${eur(f.need)} tekort op ${dateNL(iso(f.firstNeg.date))}</b>Dan gaat ${esc(f.firstNeg.label)} eraf (${eur(-f.firstNeg.amount)}). ${inTxt} Zet vóór die dag minstens ${eur(f.need)} over.</div>`;
+    return `<div class="alert warn" data-role="${role}"><b>${esc(ROLE_NAME[role]||f.name)} wordt krap</b>Laagste punt ${eur(f.min)} op ${dateNL(iso(f.minDate))}.</div>`;
+  }).join("");
+  document.querySelectorAll("#fc-warn .alert").forEach(el=>el.addEventListener("click",()=>openForecast(el.dataset.role)));
+}
+function openForecast(role){
+  const f = FC[role]; if (!f) return;
+  potView = null; $("#sheet-back").classList.add("hidden");
+  $("#sheet-title").innerHTML = `${esc(f.name)}<small>komende 5 weken · nu ${eur(f.start)}</small>`;
+  $("#sheet-meta").textContent = "Verwachte af- en bijschrijvingen op datum, met je saldo daarna. Leefgeld is een schatting per dag.";
+  const out = []; let soft = 0, softTo = null, softBal = 0;
+  const flush = ()=>{ if (soft){ out.push(`<div class="tx"><div class="n" style="color:var(--mute)">leefgeld t/m ${dateNL(iso(softTo))}</div><div class="a num">−${eur(-soft)}</div><div class="d">schatting</div><div class="p" style="${softBal<0?"color:var(--bad)":""}">${softBal<0?"−":""}${eur(Math.abs(softBal))}</div></div>`); soft=0; } };
+  for (const r of f.rows){
+    if (r.soft){ soft += r.amount; softTo = r.date; softBal = r.bal; continue; }
+    flush();
+    out.push(`<div class="tx"><div class="n">${esc(r.label)}</div><div class="a num ${r.amount>0?"in":""}">${r.amount>0?"+":"−"}${eur2(Math.abs(r.amount))}</div><div class="d">${dateNL(iso(r.date))}</div><div class="p" style="${r.bal<0?"color:var(--bad);font-weight:600":""}">${r.bal<0?"−":""}${eur(Math.abs(r.bal))}</div></div>`);
+  }
+  flush();
+  $("#sheet-body").innerHTML = out.join("") || `<div class="empty">Niets gepland.</div>`;
+  openSheet();
 }
 const DAY = 864e5;
 function dPeriod(off){
@@ -633,7 +702,7 @@ $("#bon-file").addEventListener("change", async (e)=>{
   toast(`${data.store||"Bon"} · ${eur2(Number(data.total||0))} · ${data.items} regels`);
   await load();
 });
-let pendingTx = null, BONITEMS = [], REVIEW = [], dMode = "w", dOff = 0, mutShow = 60;
+let FC = {}; let pendingTx = null, BONITEMS = [], REVIEW = [], dMode = "w", dOff = 0, mutShow = 60;
 function renderRecent(){
   const all = tx;
   const qv = ($("#mut-q").value||"").trim().toLowerCase();
