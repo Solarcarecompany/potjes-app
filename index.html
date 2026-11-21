@@ -103,7 +103,7 @@
   .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:30}
   .toast.show{opacity:1}
   .tabs{display:flex;gap:6px;background:var(--card);border-radius:12px;padding:4px;margin:6px 0 14px}
-  .tabs button{flex:1;border:0;background:none;font:inherit;font-size:14px;font-weight:500;padding:9px;border-radius:9px;color:var(--ink-2);cursor:pointer}
+  .tabs button{flex:1;border:0;background:none;font:inherit;font-size:13px;font-weight:500;padding:9px 2px;white-space:nowrap;border-radius:9px;color:var(--ink-2);cursor:pointer}
   .tabs button.on{background:var(--ink);color:#fff}
   .rc{background:var(--ink);color:#fff;border-radius:18px;padding:16px}
   .rc .k{color:rgba(255,255,255,.72);font-size:14px}
@@ -134,6 +134,34 @@
   details.sec{margin-top:18px} details.sec summary{list-style:none;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-size:13px;color:var(--mute);font-weight:500;padding:0 2px 8px}
   details.sec summary::-webkit-details-marker{display:none} details.sec summary::before{content:"›";display:inline-block;margin-right:8px;transition:transform .15s;color:var(--mute)} details.sec[open] summary::before{transform:rotate(90deg)}
   details.sec summary > span:first-child{flex:1} details.sec .sum{font-weight:400}
+  .seg3{display:flex;background:var(--card);border-radius:10px;padding:3px;margin-bottom:8px}
+  .seg3 button{flex:1;border:0;background:none;font:inherit;font-size:14px;font-weight:500;padding:7px;border-radius:8px;color:var(--ink-2);cursor:pointer}
+  .seg3 button.on{background:var(--ink);color:#fff}
+  .hnav button:disabled{opacity:.3}
+  .saldo{display:flex;gap:8px;margin-bottom:12px}
+  .saldo > div{flex:1;background:var(--card);border-radius:12px;padding:9px 12px}
+  .saldo .k{font-size:12px;color:var(--mute)} .saldo .v{font-weight:600;font-size:17px;letter-spacing:-.01em}
+  .hero{border-radius:18px;padding:16px;color:#fff;background:#1E5E48;transition:background .3s}
+  .hero.warn{background:#9A6710} .hero.bad{background:#A63A27}
+  .hero .verdict{font-size:15px;font-weight:600}
+  .hero .big{font:600 46px/1 var(--sans);letter-spacing:-.02em;margin:6px 0 4px}
+  .hero .sub{color:rgba(255,255,255,.82);font-size:14px}
+  .track{position:relative;height:12px;border-radius:6px;background:rgba(255,255,255,.22);margin:16px 0 8px}
+  .track b{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:#fff;max-width:100%}
+  .track i{position:absolute;top:-5px;bottom:-5px;width:0;border-left:2px solid #fff}
+  .track i.avg{border-left:2px dotted rgba(255,255,255,.85)}
+  .hero .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:rgba(255,255,255,.82);margin-bottom:8px}
+  .hero .legend i{display:inline-block;height:11px;width:0;vertical-align:-1px;margin-right:6px;border-left:2px solid #fff} .hero .legend i.k2{border-left-style:dotted}
+  .dp{padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer} .dp:last-child{border-bottom:0}
+  .dp .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .dp .l{font-weight:500} .dp .r{color:var(--ink-2);font-size:14px;white-space:nowrap}
+  .dp .t2{position:relative;height:8px;border-radius:4px;background:var(--line);margin:8px 0 6px}
+  .dp .t2 b{position:absolute;left:0;top:0;bottom:0;border-radius:4px;max-width:100%}
+  .dp .t2 i{position:absolute;top:-4px;bottom:-4px;width:0;border-left:2px solid var(--ink)} .dp .t2 i.avg{border-left:2px dotted var(--ink-2)}
+  .dp .s{font-size:13px;color:var(--ink-2)}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
+  .ok.dot,.dp.ok .t2 b{background:var(--ok)} .warn.dot,.dp.warn .t2 b{background:var(--warn)} .bad.dot,.dp.bad .t2 b{background:var(--bad)}
+  .keys{display:flex;gap:14px;font-size:12px;color:var(--mute);margin:8px 2px 0} .keys .dot{width:8px;height:8px;margin-right:5px}
   .hidden{display:none}
   @media (prefers-reduced-motion:reduce){.jar .fill,.toast{transition:none}}
 </style>
@@ -162,18 +190,20 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v6.0</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v7.0</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
   <div class="tabs" role="tablist">
-    <button type="button" id="tab-prive" class="on" role="tab">Week</button>
+    <button type="button" id="tab-prive" class="on" role="tab">Overzicht</button>
+    <button type="button" id="tab-mutaties" role="tab">Mutaties</button>
     <button type="button" id="tab-potjes" role="tab">Potjes</button>
     <button type="button" id="tab-bonnen" role="tab">Bonnen</button>
     <button type="button" id="tab-holding" role="tab">Holding</button>
   </div>
 
   <div id="view-holding" class="hidden">
+    <div class="saldo" id="saldo-h"></div>
     <section class="rc" aria-label="Rekening-courant">
       <div class="k">Rekening-courant: wat jij de holding schuldig bent</div>
       <div class="big num" id="rc-now">–</div>
@@ -215,33 +245,42 @@
   </div>
 
   <div id="view-prive">
-  <section class="week" aria-label="Leefgeld per week">
-    <div class="nav">
-      <button id="w-prev" type="button" aria-label="vorige week">‹</button>
-      <span id="week-range">deze week</span>
-      <button id="w-next" type="button" aria-label="volgende week">›</button>
-    </div>
-    <div class="body">
-      <div class="jar" id="jar"><div class="fill" id="jar-fill" style="height:0%"></div></div>
-      <div>
-        <div class="big num" id="week-over">–</div>
-        <div class="sub num" id="week-detail"></div>
-        <div class="days" id="days"></div>
-      </div>
-    </div>
+  <div class="saldo" id="saldo"></div>
+
+  <div class="seg3"><button id="d-w" class="on" type="button">Week</button><button id="d-m" type="button">Maand</button><button id="d-y" type="button">Jaar</button></div>
+  <div class="hnav">
+    <button id="d-prev" type="button" aria-label="vorige">‹</button>
+    <span class="lbl" id="d-label">deze week</span>
+    <button id="d-next" type="button" aria-label="volgende">›</button>
+  </div>
+
+  <section class="hero ok" id="hero" aria-label="Hoe sta ik ervoor">
+    <div class="verdict" id="hero-verdict">–</div>
+    <div class="big num" id="hero-big">–</div>
+    <div class="sub" id="hero-sub"></div>
+    <div class="track"><b id="hero-fill"></b><i class="pace" id="hero-pace"></i><i class="avg" id="hero-avg"></i></div>
+    <div class="legend"><span><i class="k1"></i>waar je nu zou mogen zitten</span><span id="hero-avg-l"><i class="k2"></i>waar je normaal zit</span></div>
+    <div class="sub" id="hero-cmp"></div>
   </section>
 
-  <div class="month">
-    <div class="tile"><div class="k">Leefgeld deze maand</div><div class="v num" id="m-budget">–</div><div class="s">budget</div></div>
-    <div class="tile"><div class="k">Uitgegeven</div><div class="v num" id="m-spent">–</div><div class="s" id="m-spent-s"></div></div>
-    <div class="tile"><div class="k">Rest van de maand</div><div class="v num" id="m-left">–</div><div class="s" id="m-left-s"></div></div>
-  </div>
+  <h2>Per potje</h2>
+  <div class="card" id="dash-pots"></div>
+  <div class="keys"><span><i class="dot ok"></i>op schema</span><span><i class="dot warn"></i>te snel</span><span><i class="dot bad"></i>over budget</span></div>
+
+  <a href="#mutaties" class="recur hidden" id="dash-todo" style="text-decoration:none;text-align:center"></a>
 
   <details class="sec" data-sec="vast"><summary><span>Vaste lasten deze maand</span><span class="sum" id="vast-sum"></span></summary>
   <div class="card" id="expected-prive"></div></details>
 
+  </div>
+
+  <div id="view-mutaties" class="hidden">
   <h2 id="review-title">Nog in te delen</h2>
   <div class="card" id="review"></div>
+  <h2>Alle bij- en afschrijvingen</h2>
+  <input id="mut-q" type="search" placeholder="zoek op naam, bedrag of potje" style="width:100%;font:inherit;font-size:15px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card);margin-bottom:10px">
+  <div class="card" id="recent"></div>
+  <button type="button" id="mut-more" class="recur hidden" style="margin-top:10px">Meer tonen</button>
   </div>
 
   <div id="view-potjes" class="hidden">
@@ -254,8 +293,6 @@
   <h2>Opzij gezet</h2>
   <div class="tiles" id="tiles"></div>
 
-  <details class="sec" data-sec="recent"><summary><span>Laatste bij- en afschrijvingen</span></summary>
-  <div class="card" id="recent"></div></details>
   </div>
 
   <div id="view-bonnen" class="hidden">
@@ -300,7 +337,7 @@ const ls = { get:(k)=>{try{return localStorage.getItem(k)}catch{return null}}, s
 const esc = (s) => String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
 
 if (SUPABASE_KEY.startsWith("__")) SUPABASE_KEY = ls.get("potjes.key") || "";
-let HTX = [], HP = [], hMode = "m", hOff = 0; let sb = null, pots = [], allPots = [], tx = [], weekOffset = 0, view = (["potjes","bonnen","holding"].includes(location.hash.slice(1))?location.hash.slice(1):"prive"), accountRole = {};
+let HTX = [], HP = [], hMode = "m", hOff = 0; let sb = null, pots = [], allPots = [], tx = [], weekOffset = 0, view = (["mutaties","potjes","bonnen","holding"].includes(location.hash.slice(1))?location.hash.slice(1):"prive"), accountRole = {};
 const potLabel = (id)=> (allPots.find(p=>p.id===id)||{}).label || id || "kies potje";
 
 function show(id){ for (const s of ["login","setup","app"]) $("#"+s).classList.toggle("hidden", s!==id); }
@@ -321,16 +358,25 @@ $("#f-login").addEventListener("submit", async (e)=>{
   ls.set("potjes.email",email); show("app"); await load();
 });
 $("#refresh").addEventListener("click", load);
-const VIEWS=["prive","potjes","bonnen","holding"];
+const VIEWS=["prive","mutaties","potjes","bonnen","holding"];
 function setView(v){ view=v; for (const x of VIEWS){ $("#view-"+x).classList.toggle("hidden", v!==x); $("#tab-"+x).classList.toggle("on", v===x); } history.replaceState(null,"", v==="prive"?" ":"#"+v); }
 for (const x of VIEWS) $("#tab-"+x).addEventListener("click", ()=>setView(x));
 window.addEventListener("hashchange", ()=>setView(VIEWS.includes(location.hash.slice(1))?location.hash.slice(1):"prive"));
 // uitklapstand onthouden
 document.querySelectorAll("details.sec").forEach(d=>{ try{ const st=localStorage.getItem("potjes.sec."+d.dataset.sec); if (st==="1") d.open=true; }catch{}; d.addEventListener("toggle",()=>{ try{ localStorage.setItem("potjes.sec."+d.dataset.sec, d.open?"1":"0"); }catch{} }); });
 $("#logout").addEventListener("click", async ()=>{ await sb.auth.signOut(); show("login"); });
-$("#w-prev").addEventListener("click", ()=>{ weekOffset++; renderWeek(); });
-$("#w-next").addEventListener("click", ()=>{ if (weekOffset>0){ weekOffset--; renderWeek(); } });
+$("#d-prev").addEventListener("click", ()=>{ dOff++; renderDash(); });
+$("#d-next").addEventListener("click", ()=>{ if (dOff>0){ dOff--; renderDash(); } });
+for (const m of ["w","m","y"]) $("#d-"+m).addEventListener("click", ()=>{ dMode=m; dOff=0; for (const x of ["w","m","y"]) $("#d-"+x).classList.toggle("on", x===m); renderDash(); });
+$("#mut-q").addEventListener("input", ()=>{ mutShow=60; renderRecent(); });
+$("#mut-more").addEventListener("click", ()=>{ mutShow+=100; renderRecent(); });
 
+async function qAll(view, order="booking_date"){
+  const out=[]; for (let from=0; ; from+=1000){
+    const { data, error } = await sb.from(view).select("*").order(order,{ascending:false}).order("id",{ascending:false}).range(from, from+999);
+    if (error) throw error; out.push(...data); if (data.length<1000) break; }
+  return out;
+}
 async function q(view, opts={}){
   let r = sb.from(view).select("*");
   if (opts.order) r = r.order(opts.order, {ascending:false});
@@ -342,9 +388,9 @@ async function q(view, opts={}){
 
 async function load(){
   try{
-    const [potRows, txRows, projects, tiles, review, recent, sync, rc, expected, reserve, holdingTx, bonCats, bonnen, bonItems, vaak, bonus] = await Promise.all([
-      q("pots"), q("v_leefgeld_tx"), q("v_projecten"), q("v_spaarpotjes"), q("v_te_beoordelen",{limit:60}), q("v_recent",{limit:80}), q("v_sync"),
-      q("v_rc").catch(()=>[]), q("v_expected_month").catch(()=>[]), q("v_holding_reserve").catch(()=>[]), q("v_holding_tx").catch(()=>[]), q("v_bon_categorie").catch(()=>[]), q("v_bonnen",{limit:30}).catch(()=>[]), q("v_bon_items").catch(()=>[]), q("v_vaak_gekocht",{limit:25}).catch(()=>[]), q("v_bonus_week").catch(()=>[])
+    const [potRows, txRows, projects, tiles, review, recent, sync, rc, expected, reserve, holdingTx, bonCats, bonnen, bonItems, vaak, bonus, saldo] = await Promise.all([
+      q("pots"), qAll("v_leefgeld_tx"), q("v_projecten"), q("v_spaarpotjes"), q("v_te_beoordelen",{limit:60}), q("v_recent",{limit:80}), q("v_sync"),
+      q("v_rc").catch(()=>[]), q("v_expected_month").catch(()=>[]), q("v_holding_reserve").catch(()=>[]), qAll("v_holding_tx").catch(()=>[]), q("v_bon_categorie").catch(()=>[]), q("v_bonnen",{limit:30}).catch(()=>[]), qAll("v_bon_items","datum").catch(()=>[]), q("v_vaak_gekocht",{limit:25}).catch(()=>[]), q("v_bonus_week").catch(()=>[]), q("v_saldo").catch(()=>[])
     ]);
     allPots = potRows;
     pots = potRows.filter(p=>(p.scope||"prive")==="prive").sort((a,b)=>POT_ORDER.indexOf(a.id)-POT_ORDER.indexOf(b.id));
@@ -352,8 +398,9 @@ async function load(){
     const isH = (r)=>r.account_role==="holding";
     tx = txRows.filter(r=>!isH(r));
     const htx = holdingTx; HTX = htx; HP = hp;
-    renderWeek(); renderMonth(); renderProjects(projects); renderTiles(tiles);
-    renderReview(review.filter(r=>!isH(r))); renderRecent(recent.filter(r=>!isH(r))); renderSync(sync[0]);
+    REVIEW = review.filter(r=>!isH(r));
+    renderSaldo(saldo); renderDash(); renderMonth(); renderProjects(projects); renderTiles(tiles);
+    renderReview(REVIEW); renderRecent(); renderSync(sync[0]);
     renderRC(rc[0]); renderExpected(expected.filter(r=>r.scope==="holding")); renderExpected(expected.filter(r=>r.scope==="prive"), "#expected-prive", "prive"); renderReserve(reserve[0]); renderHoldingMonth(htx, hp);
     renderHList("#h-review", review.filter(isH), "Alles is ingedeeld."); $("#h-review-title").textContent = review.filter(isH).length ? `Nog in te delen (${review.filter(isH).length})` : "Nog in te delen";
     renderHList("#h-recent", recent.filter(isH), "Nog geen mutaties van de holding. Koppel de zakelijke rekening met connect_bank.py \"ING\" business.");
@@ -374,23 +421,69 @@ const weekBudget = () => leefgeldPots().reduce((s,p)=>s+Number(p.budget_month||0
 function isoWeek(d){ const x=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())); const day=x.getUTCDay()||7; x.setUTCDate(x.getUTCDate()+4-day); const y=new Date(Date.UTC(x.getUTCFullYear(),0,1)); return Math.ceil(((x-y)/864e5+1)/7); }
 function mondayOf(d){ const x=new Date(d); x.setHours(0,0,0,0); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); return x; }
 
-function renderWeek(){
-  const today = new Date(); today.setHours(0,0,0,0);
-  const start = mondayOf(today); start.setDate(start.getDate()-7*weekOffset);
-  const end = new Date(start); end.setDate(start.getDate()+6);
-  const s = iso(start), e = iso(end);
-  const spent = tx.filter(t=>t.kind==="leefgeld" && t.booking_date>=s && t.booking_date<=e).reduce((a,t)=>a-Number(t.amount),0);
-  const budget = weekBudget(), over = budget - spent;
-  const pct = budget>0 ? Math.max(0, Math.min(100, over/budget*100)) : 0;
-  const jar = $("#jar"); jar.classList.toggle("low", pct<35 && pct>0); jar.classList.toggle("empty", over<=0);
-  $("#jar-fill").style.height = pct+"%";
-  $("#week-over").textContent = (over<0?"−":"")+eur(Math.abs(over));
-  const daysLeft = weekOffset===0 ? Math.max(0, Math.round((end-today)/864e5)+1) : 0;
-  $("#week-detail").textContent = over<0 ? `${eur(Math.abs(over))} over het weekbudget van ${eur(budget)}` : `over van ${eur(budget)} · ${eur(spent)} uitgegeven` + (daysLeft>0 ? ` · ${eur(over/daysLeft)} per dag` : "");
-  $("#week-range").textContent = `week ${isoWeek(start)} · ${dateNL(s)} t/m ${dateNL(e)}` + (weekOffset===0 ? "" : weekOffset===1 ? " · vorige week" : "");
-  $("#w-next").disabled = weekOffset===0;
-  const days = $("#days"); days.innerHTML="";
-  for (let i=0;i<7;i++){ const d=new Date(start); d.setDate(start.getDate()+i); const el=document.createElement("i"); if (d<today) el.className="past"; if (d.getTime()===today.getTime()) el.className="today"; days.appendChild(el); }
+function renderSaldo(rows){
+  const pr = (rows||[]).filter(r=>r.role!=="holding");
+  $("#saldo-h").innerHTML = (rows||[]).filter(r=>r.role==="holding").map(r=>`<div><div class="k">Saldo ${esc(r.name)}</div><div class="v num">${r.balance==null?"–":eur(Number(r.balance))}</div></div>`).join("");
+  $("#saldo").innerHTML = pr.map(r=>`<div><div class="k">${esc(r.name)}</div><div class="v num">${r.balance==null?"–":eur(Number(r.balance))}</div></div>`).join("");
+}
+const DAY = 864e5;
+function dPeriod(off){
+  const t = new Date(); t.setHours(0,0,0,0); let start, end, label;
+  if (dMode==="w"){ start = mondayOf(t); start.setDate(start.getDate()-7*off); end = new Date(start); end.setDate(start.getDate()+6); label = `week ${isoWeek(start)} · ${dateNL(iso(start))} t/m ${dateNL(iso(end))}`; }
+  else if (dMode==="m"){ start = new Date(t.getFullYear(), t.getMonth()-off, 1); end = new Date(start.getFullYear(), start.getMonth()+1, 0); label = start.toLocaleDateString("nl-NL",{month:"long",year:"numeric"}); }
+  else { start = new Date(t.getFullYear()-off, 0, 1); end = new Date(start.getFullYear(), 11, 31); label = String(start.getFullYear()); }
+  const total = Math.round((end-start)/DAY)+1;
+  const elapsed = t>end ? total : Math.max(1, Math.round((t-start)/DAY)+1);
+  return { start, end, s:iso(start), e:iso(end), label, total, elapsed, current: t>=start && t<=end };
+}
+const potBudget = (p)=> Number(p.budget_month||0) * (dMode==="w" ? 12/52 : dMode==="m" ? 1 : 12);
+function spentBetween(ids, s, e){ let x=0; for (const t of tx) if (ids.includes(t.pot_id) && t.booking_date>=s && t.booking_date<=e) x-=Number(t.amount); return x; }
+// wat je normaal op dit punt in de periode kwijt bent: gemiddelde van de vorige perioden t/m dezelfde dag
+function usualAt(ids, per){
+  if (dMode==="y") return null;
+  const n = dMode==="w" ? 8 : 6, vals=[];
+  const first = tx.length ? tx[tx.length-1].booking_date : null; if (!first) return null;
+  for (let k=1; k<=n; k++){
+    let st, en;
+    if (dMode==="w"){ st = new Date(per.start); st.setDate(st.getDate()-7*k); }
+    else { st = new Date(per.start.getFullYear(), per.start.getMonth()-k, 1); }
+    en = new Date(st); en.setDate(st.getDate()+per.elapsed-1);
+    if (dMode==="m"){ const last = new Date(st.getFullYear(), st.getMonth()+1, 0); if (en>last) en = last; }
+    if (iso(st) < first) break;
+    vals.push(spentBetween(ids, iso(st), iso(en)));
+  }
+  return vals.length>=3 ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+}
+function status(spent, budget, pace){ return spent>budget+0.5 ? "bad" : spent>pace*1.1+1 ? "warn" : "ok"; }
+function renderDash(){
+  const per = dPeriod(dOff), lp = leefgeldPots(), ids = lp.map(p=>p.id);
+  $("#d-label").textContent = per.label; $("#d-next").disabled = dOff===0;
+  const budget = lp.reduce((a,p)=>a+potBudget(p),0), spent = spentBetween(ids, per.s, per.e);
+  const pace = budget*per.elapsed/per.total, left = budget-spent, st = status(spent, budget, pace), usual = usualAt(ids, per);
+  const hero = $("#hero"); hero.className = "hero "+st;
+  const word = dMode==="w"?"week":dMode==="m"?"maand":"jaar";
+  $("#hero-verdict").textContent = !per.current ? (st==="bad" ? `Deze ${word} ging je ${eur(-left)} over het budget` : `Deze ${word} hield je ${eur(left)} over`)
+    : st==="bad" ? `Je bent ${eur(-left)} over je ${word}budget`
+    : st==="warn" ? `Je gaat te snel: ${eur(spent-pace)} boven schema`
+    : `Je ligt ${eur(pace-spent)} voor op schema`;
+  $("#hero-big").textContent = (left<0?"−":"")+eur(Math.abs(left));
+  const dl = per.total-per.elapsed+1;
+  $("#hero-sub").textContent = `${left<0?"tekort":"over"} van ${eur(budget)} leefgeld · ${eur(spent)} uitgegeven` + (per.current && left>0 ? ` · ${eur(left/dl)} per dag, nog ${dl} ${dl===1?"dag":"dagen"}` : "");
+  $("#hero-fill").style.width = Math.min(100, budget>0?spent/budget*100:0)+"%";
+  $("#hero-pace").style.left = Math.min(100, per.elapsed/per.total*100)+"%"; $("#hero-pace").classList.toggle("hidden", !per.current);
+  const showAvg = usual!=null && budget>0;
+  $("#hero-avg").classList.toggle("hidden", !showAvg); $("#hero-avg-l").classList.toggle("hidden", !showAvg);
+  if (showAvg) $("#hero-avg").style.left = Math.min(100, usual/budget*100)+"%";
+  $("#hero-cmp").textContent = showAvg ? (Math.abs(usual-spent)<5 ? `Precies wat je normaal op dit punt uitgeeft (${eur(usual)}).` : spent<usual ? `${eur(usual-spent)} minder dan je normaal op dit punt uitgeeft (${eur(usual)}).` : `${eur(spent-usual)} meer dan je normaal op dit punt uitgeeft (${eur(usual)}).`) : (dMode==="y" ? `${Math.round(per.elapsed/per.total*100)}% van het jaar voorbij, ${Math.round(budget>0?spent/budget*100:0)}% van het jaarbudget op.` : "");
+  $("#dash-pots").innerHTML = lp.map(p=>{
+    const b = potBudget(p), sp = spentBetween([p.id], per.s, per.e), pc = b*per.elapsed/per.total, s2 = status(sp, b, pc), us = usualAt([p.id], per);
+    const txt = sp>b+0.5 ? `${eur(sp-b)} over budget` : !per.current ? `${eur(b-sp)} over` : sp>pc ? `${eur(sp-pc)} boven schema` : `${eur(pc-sp)} voor op schema`;
+    return `<div class="dp ${s2}" data-pot="${p.id}"><div class="top"><div class="l"><i class="dot ${s2}"></i>${esc(p.label)}</div><div class="r num">${eur(sp)} van ${eur(b)}</div></div>
+      <div class="t2"><b style="width:${Math.min(100,b>0?sp/b*100:0)}%"></b>${per.current?`<i style="left:${Math.min(100,per.elapsed/per.total*100)}%"></i>`:""}${us!=null&&b>0?`<i class="avg" style="left:${Math.min(100,us/b*100)}%"></i>`:""}</div>
+      <div class="s">${txt}${us!=null?` · normaal ${eur(us)} op dit punt`:""}</div></div>`;
+  }).join("");
+  document.querySelectorAll("#dash-pots .dp").forEach(el=>el.addEventListener("click",()=>openPot(el.dataset.pot, true, tx.filter(t=>t.booking_date>=per.s && t.booking_date<=per.e), potLabel(el.dataset.pot)+" · "+per.label)));
+  const todo = REVIEW.length; $("#dash-todo").classList.toggle("hidden", !todo); if (todo) $("#dash-todo").textContent = `${todo} ${todo===1?"mutatie":"mutaties"} nog in te delen ›`;
 }
 
 function monthRange(){ const n=new Date(); const s=new Date(n.getFullYear(),n.getMonth(),1), e=new Date(n.getFullYear(),n.getMonth()+1,0); return [iso(s),iso(e),e.getDate(),n.getDate()]; }
@@ -402,11 +495,6 @@ function renderMonth(){
   const lp = leefgeldPots();
   const budget = lp.reduce((s,p)=>s+Number(p.budget_month||0),0);
   const spent = lp.reduce((s,p)=>s+(spentBy[p.id]||0),0);
-  const left = budget - spent, daysLeft = daysInMonth - today + 1;
-  $("#m-budget").textContent = eur(budget);
-  $("#m-spent").textContent = eur(spent); $("#m-spent-s").textContent = `${Math.round(spent/budget*100)}% na ${Math.round(today/daysInMonth*100)}% van de maand`;
-  $("#m-left").textContent = (left<0?"−":"")+eur(Math.abs(left)); $("#m-left").style.color = left<0?"var(--bad)":"";
-  $("#m-left-s").textContent = left>0 ? `${eur(left/daysLeft)} per dag, ${daysLeft} dagen` : "over het maandbudget";
   $("#month-title").textContent = new Date().toLocaleDateString("nl-NL",{month:"long"}).replace(/^./,c=>c.toUpperCase()) + " per potje";
   const list = pots.filter(p=>["leefgeld","vast"].includes(p.kind) && (p.budget_month>0 || spentBy[p.id]));
   $("#pots-month").innerHTML = list.map(p=>{
@@ -545,9 +633,13 @@ $("#bon-file").addEventListener("change", async (e)=>{
   toast(`${data.store||"Bon"} · ${eur2(Number(data.total||0))} · ${data.items} regels`);
   await load();
 });
-let pendingTx = null, BONITEMS = [];
-function renderRecent(rows){
-  $("#recent").innerHTML = rows.length ? rows.map(txRow).join("") : `<div class="empty">Nog niets opgehaald. De sync draait elke 4 uur.</div>`;
+let pendingTx = null, BONITEMS = [], REVIEW = [], dMode = "w", dOff = 0, mutShow = 60;
+function renderRecent(){
+  const all = tx;
+  const qv = ($("#mut-q").value||"").trim().toLowerCase();
+  const rows = qv ? all.filter(t=>((t.counterparty_name||"")+" "+(t.description||"")+" "+(t.pot_label||"")+" "+String(Math.abs(Number(t.amount))).replace(".",",")).toLowerCase().includes(qv)) : all;
+  $("#recent").innerHTML = rows.length ? rows.slice(0,mutShow).map(txRow).join("") : `<div class="empty">${qv?"Niets gevonden.":"Nog niets opgehaald. De sync draait elke 4 uur."}</div>`;
+  $("#mut-more").classList.toggle("hidden", rows.length<=mutShow); $("#mut-more").textContent = `Meer tonen (${rows.length-mutShow} ouder)`;
   bindTx("#recent");
 }
 function bindTx(sel){ document.querySelectorAll(sel+" .tx").forEach(el=>el.addEventListener("click",()=>openPicker(el.dataset, sel.startsWith("#sheet")))); }
