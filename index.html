@@ -160,6 +160,7 @@
   .dp .t2{position:relative;height:8px;border-radius:4px;background:var(--line);margin:8px 0 6px}
   .dp .t2 b{position:absolute;left:0;top:0;bottom:0;border-radius:4px;max-width:100%}
   .dp .t2 i{position:absolute;top:-4px;bottom:-4px;width:0;border-left:2px solid var(--ink)} .dp .t2 i.avg{border-left:2px dotted var(--ink-2)}
+  .dp .per{margin:4px 0 0 18px} .dp .per span{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--paper);color:var(--ink-2)} .dp .per span.m{background:var(--ink);color:#fff}
   .dp .s{font-size:13px;color:var(--ink-2)}
   .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
   .ok.dot,.dp.ok .t2 b{background:var(--ok)} .warn.dot,.dp.warn .t2 b{background:var(--warn)} .bad.dot,.dp.bad .t2 b{background:var(--bad)}
@@ -199,7 +200,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v7.2</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v7.3</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -581,8 +582,9 @@ function renderDash(){
     const txt = sp>b+0.5 ? `${eur(sp-b)} over budget` : !pp.current ? `${eur(b-sp)} over` : sp>pc ? `${eur(sp-pc)} boven schema` : `${eur(pc-sp)} voor op schema`;
     const wk = mj ? spentBetween([p.id], per.s, per.e) : 0;
     return `<div class="dp ${s2}" data-pot="${p.id}"><div class="top"><div class="l"><i class="dot ${s2}"></i>${esc(p.label)}</div><div class="r num">${eur(sp)} van ${eur(b)}</div></div>
+      <div class="per"><span class="${mj?"m":""}">${md==="w"?"deze week":md==="m"?(mj?"hele maand "+pp.label:"deze maand"):"dit jaar"}</span></div>
       <div class="t2"><b style="width:${Math.min(100,b>0?sp/b*100:0)}%"></b>${pp.current?`<i style="left:${Math.min(100,pp.elapsed/pp.total*100)}%"></i>`:""}${us!=null&&b>0?`<i class="avg" style="left:${Math.min(100,us/b*100)}%"></i>`:""}</div>
-      <div class="s">${txt}${us!=null?` · normaal ${eur(us)} op dit punt`:""}${mj?`<br><span style="color:var(--mute)">beoordeeld over heel ${pp.label} · deze week ${eur(wk)}</span>`:""}</div></div>`;
+      <div class="s">${txt}${us!=null?` · normaal ${eur(us)} op dit punt`:""}${mj?` · waarvan deze week ${eur(wk)}`:""}</div></div>`;
   }).join("");
   document.querySelectorAll("#dash-pots .dp").forEach(el=>el.addEventListener("click",()=>{ const pp = PP[el.dataset.pot]; openPot(el.dataset.pot, true, tx.filter(t=>t.booking_date>=pp.s && t.booking_date<=pp.e), potLabel(el.dataset.pot)+" · "+(pp.label||per.label)); }));
   const todo = REVIEW.length; $("#dash-todo").classList.toggle("hidden", !todo); if (todo) $("#dash-todo").textContent = `${todo} ${todo===1?"mutatie":"mutaties"} nog in te delen ›`;
