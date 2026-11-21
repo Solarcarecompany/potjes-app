@@ -164,6 +164,13 @@
   .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
   .ok.dot,.dp.ok .t2 b{background:var(--ok)} .warn.dot,.dp.warn .t2 b{background:var(--warn)} .bad.dot,.dp.bad .t2 b{background:var(--bad)}
   .keys{display:flex;gap:14px;font-size:12px;color:var(--mute);margin:8px 2px 0} .keys .dot{width:8px;height:8px;margin-right:5px}
+  .coach{background:var(--card);border-radius:16px;padding:14px 16px;margin-top:12px;border-left:5px solid var(--ok)}
+  .coach.warn{border-left-color:var(--warn)} .coach.bad{border-left-color:var(--bad)}
+  .coach .ch{display:flex;justify-content:space-between;font-size:13px;color:var(--mute);margin-bottom:6px} .coach .ch a{color:var(--ink-2)}
+  .coach .kop{font-weight:600;font-size:16px;margin-bottom:8px}
+  .coach h3{font-size:12px;font-weight:600;color:var(--mute);margin:10px 0 2px;text-transform:none}
+  .coach ul{margin:0;padding-left:18px} .coach li{margin:3px 0;font-size:14.5px}
+  .coach .mom{font-size:13px;color:var(--ink-2);margin-top:10px}
   .hidden{display:none}
   @media (prefers-reduced-motion:reduce){.jar .fill,.toast{transition:none}}
 </style>
@@ -192,7 +199,7 @@
 
 <main id="app" class="hidden">
   <header>
-    <div><h1>Potjes <span class="sync">v7.1</span></h1><div class="sync" id="sync">–</div></div>
+    <div><h1>Potjes <span class="sync">v7.2</span></h1><div class="sync" id="sync">–</div></div>
     <div><button id="refresh" type="button">vernieuwen</button><button id="logout" type="button">uitloggen</button></div>
   </header>
 
@@ -264,6 +271,11 @@
     <div class="track"><b id="hero-fill"></b><i class="pace" id="hero-pace"></i><i class="avg" id="hero-avg"></i></div>
     <div class="legend"><span><i class="k1"></i>waar je nu zou mogen zitten</span><span id="hero-avg-l"><i class="k2"></i>waar je normaal zit</span></div>
     <div class="sub" id="hero-cmp"></div>
+  </section>
+
+  <section class="coach" id="coach">
+    <div class="ch"><span>Analyse van vandaag</span><a href="#" id="coach-new">nieuwe analyse</a></div>
+    <div id="coach-body"><div class="empty">Nog geen analyse.</div></div>
   </section>
 
   <h2>Per potje</h2>
@@ -391,9 +403,9 @@ async function q(view, opts={}){
 
 async function load(){
   try{
-    const [potRows, txRows, projects, tiles, review, recent, sync, rc, expected, reserve, holdingTx, bonCats, bonnen, bonItems, vaak, bonus, saldo, flows] = await Promise.all([
+    const [potRows, txRows, projects, tiles, review, recent, sync, rc, expected, reserve, holdingTx, bonCats, bonnen, bonItems, vaak, bonus, saldo, flows, notes] = await Promise.all([
       q("pots"), qAll("v_leefgeld_tx"), q("v_projecten"), q("v_spaarpotjes"), q("v_te_beoordelen",{limit:60}), q("v_recent",{limit:80}), q("v_sync"),
-      q("v_rc").catch(()=>[]), q("v_expected_month").catch(()=>[]), q("v_holding_reserve").catch(()=>[]), qAll("v_holding_tx").catch(()=>[]), q("v_bon_categorie").catch(()=>[]), q("v_bonnen",{limit:30}).catch(()=>[]), qAll("v_bon_items","datum").catch(()=>[]), q("v_vaak_gekocht",{limit:25}).catch(()=>[]), q("v_bonus_week").catch(()=>[]), q("v_saldo").catch(()=>[]), q("planned_flows").catch(()=>[])
+      q("v_rc").catch(()=>[]), q("v_expected_month").catch(()=>[]), q("v_holding_reserve").catch(()=>[]), qAll("v_holding_tx").catch(()=>[]), q("v_bon_categorie").catch(()=>[]), q("v_bonnen",{limit:30}).catch(()=>[]), qAll("v_bon_items","datum").catch(()=>[]), q("v_vaak_gekocht",{limit:25}).catch(()=>[]), q("v_bonus_week").catch(()=>[]), q("v_saldo").catch(()=>[]), q("planned_flows").catch(()=>[]), q("coach_notes",{order:"created_at",limit:1}).catch(()=>[])
     ]);
     allPots = potRows;
     pots = potRows.filter(p=>(p.scope||"prive")==="prive").sort((a,b)=>POT_ORDER.indexOf(a.id)-POT_ORDER.indexOf(b.id));
@@ -409,6 +421,7 @@ async function load(){
     renderHList("#h-review", review.filter(isH), "Alles is ingedeeld."); $("#h-review-title").textContent = review.filter(isH).length ? `Nog in te delen (${review.filter(isH).length})` : "Nog in te delen";
     renderHList("#h-recent", recent.filter(isH), "Nog geen mutaties van de holding. Koppel de zakelijke rekening met connect_bank.py \"ING\" business.");
     BONITEMS = bonItems; renderBonnen(bonCats, bonnen); renderBonus(bonus); renderVaak(vaak);
+    renderCoach(notes[0]); if (!notes[0] || notes[0].created_at.slice(0,10) !== new Date().toISOString().slice(0,10)) askCoach(true);
     setView(view);
   }catch(e){ console.error(e); toast(/JWT|permission|denied|row-level/i.test(e.message||"") ? "Geen toegang: ingelogd met het juiste e-mailadres?" : "Laden mislukt: "+(e.message||e)); }
 }
@@ -425,6 +438,22 @@ const weekBudget = () => leefgeldPots().reduce((s,p)=>s+Number(p.budget_month||0
 function isoWeek(d){ const x=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())); const day=x.getUTCDay()||7; x.setUTCDate(x.getUTCDate()+4-day); const y=new Date(Date.UTC(x.getUTCFullYear(),0,1)); return Math.ceil(((x-y)/864e5+1)/7); }
 function mondayOf(d){ const x=new Date(d); x.setHours(0,0,0,0); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); return x; }
 
+function renderCoach(n){
+  const el = $("#coach"); if (!n){ return; }
+  const c = n.content||{}; el.className = "coach "+(["warn","bad"].includes(c.kleur)?c.kleur:"");
+  const d = new Date(n.created_at), same = d.toDateString()===new Date().toDateString();
+  el.querySelector(".ch span").textContent = "Analyse · " + (same?"vandaag ":d.toLocaleDateString("nl-NL",{day:"numeric",month:"short"})+" ") + d.toLocaleTimeString("nl-NL",{hour:"2-digit",minute:"2-digit"});
+  const list = (t, arr)=> (arr&&arr.length) ? `<h3>${t}</h3><ul>${arr.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>` : "";
+  $("#coach-body").innerHTML = `<div class="kop">${esc(c.kop||"")}</div>${list("Gaat goed", c.goed)}${list("Let op", c.let_op)}${list("Voor de komende dagen", c.tips)}${c.moment?`<div class="mom">${esc(c.moment)}</div>`:""}`;
+}
+let coachBusy = false;
+async function askCoach(silent){
+  if (coachBusy) return; coachBusy = true; $("#coach-new").textContent = "bezig…";
+  try{ const { data, error } = await sb.functions.invoke("coach", { body: {} });
+    if (error || data?.error){ if (!silent) toast("Analyse mislukt: "+(error?.message||data?.error)); } else renderCoach(data);
+  } finally { coachBusy = false; $("#coach-new").textContent = "nieuwe analyse"; }
+}
+$("#coach-new").addEventListener("click", (e)=>{ e.preventDefault(); askCoach(false); });
 const ROLE_NAME = { leefgeld:"ING", vaste_lasten:"ABN" };
 function forecast(saldo, exp, flows, days=35){
   const t0 = new Date(); t0.setHours(0,0,0,0); const end = new Date(t0); end.setDate(end.getDate()+days);
@@ -505,19 +534,20 @@ function dPeriod(off){
   const elapsed = t>end ? total : Math.max(1, Math.round((t-start)/DAY)+1);
   return { start, end, s:iso(start), e:iso(end), label, total, elapsed, current: t>=start && t<=end };
 }
-const potBudget = (p)=> Number(p.budget_month||0) * (dMode==="w" ? 12/52 : dMode==="m" ? 1 : 12);
+const potBudget = (p, mode=dMode)=> Number(p.budget_month||0) * (mode==="w" ? 12/52 : mode==="m" ? 1 : 12);
+function monthOf(per){ const t=new Date(); t.setHours(0,0,0,0); const ref = per.current ? t : per.end; const start=new Date(ref.getFullYear(),ref.getMonth(),1), end=new Date(ref.getFullYear(),ref.getMonth()+1,0); const total=end.getDate(); return { start, end, s:iso(start), e:iso(end), total, elapsed: t>end?total:t.getDate(), current: t>=start&&t<=end, label:start.toLocaleDateString("nl-NL",{month:"long"}) }; }
 function spentBetween(ids, s, e){ let x=0; for (const t of tx) if (ids.includes(t.pot_id) && t.booking_date>=s && t.booking_date<=e) x-=Number(t.amount); return x; }
 // wat je normaal op dit punt in de periode kwijt bent: gemiddelde van de vorige perioden t/m dezelfde dag
-function usualAt(ids, per){
-  if (dMode==="y") return null;
-  const n = dMode==="w" ? 8 : 6, vals=[];
+function usualAt(ids, per, mode=dMode){
+  if (mode==="y") return null;
+  const n = mode==="w" ? 8 : 6, vals=[];
   const first = tx.length ? tx[tx.length-1].booking_date : null; if (!first) return null;
   for (let k=1; k<=n; k++){
     let st, en;
-    if (dMode==="w"){ st = new Date(per.start); st.setDate(st.getDate()-7*k); }
+    if (mode==="w"){ st = new Date(per.start); st.setDate(st.getDate()-7*k); }
     else { st = new Date(per.start.getFullYear(), per.start.getMonth()-k, 1); }
     en = new Date(st); en.setDate(st.getDate()+per.elapsed-1);
-    if (dMode==="m"){ const last = new Date(st.getFullYear(), st.getMonth()+1, 0); if (en>last) en = last; }
+    if (mode==="m"){ const last = new Date(st.getFullYear(), st.getMonth()+1, 0); if (en>last) en = last; }
     if (iso(st) < first) break;
     vals.push(spentBetween(ids, iso(st), iso(en)));
   }
@@ -544,14 +574,17 @@ function renderDash(){
   $("#hero-avg").classList.toggle("hidden", !showAvg); $("#hero-avg-l").classList.toggle("hidden", !showAvg);
   if (showAvg) $("#hero-avg").style.left = Math.min(100, usual/budget*100)+"%";
   $("#hero-cmp").textContent = showAvg ? (Math.abs(usual-spent)<5 ? `Precies wat je normaal op dit punt uitgeeft (${eur(usual)}).` : spent<usual ? `${eur(usual-spent)} minder dan je normaal op dit punt uitgeeft (${eur(usual)}).` : `${eur(spent-usual)} meer dan je normaal op dit punt uitgeeft (${eur(usual)}).`) : (dMode==="y" ? `${Math.round(per.elapsed/per.total*100)}% van het jaar voorbij, ${Math.round(budget>0?spent/budget*100:0)}% van het jaarbudget op.` : "");
+  const PP = {};
   $("#dash-pots").innerHTML = lp.map(p=>{
-    const b = potBudget(p), sp = spentBetween([p.id], per.s, per.e), pc = b*per.elapsed/per.total, s2 = status(sp, b, pc), us = usualAt([p.id], per);
-    const txt = sp>b+0.5 ? `${eur(sp-b)} over budget` : !per.current ? `${eur(b-sp)} over` : sp>pc ? `${eur(sp-pc)} boven schema` : `${eur(pc-sp)} voor op schema`;
+    const mj = dMode==="w" && p.judge==="month", pp = mj ? monthOf(per) : per, md = mj ? "m" : dMode; PP[p.id] = pp;
+    const b = potBudget(p, md), sp = spentBetween([p.id], pp.s, pp.e), pc = b*pp.elapsed/pp.total, s2 = status(sp, b, pc), us = usualAt([p.id], pp, md);
+    const txt = sp>b+0.5 ? `${eur(sp-b)} over budget` : !pp.current ? `${eur(b-sp)} over` : sp>pc ? `${eur(sp-pc)} boven schema` : `${eur(pc-sp)} voor op schema`;
+    const wk = mj ? spentBetween([p.id], per.s, per.e) : 0;
     return `<div class="dp ${s2}" data-pot="${p.id}"><div class="top"><div class="l"><i class="dot ${s2}"></i>${esc(p.label)}</div><div class="r num">${eur(sp)} van ${eur(b)}</div></div>
-      <div class="t2"><b style="width:${Math.min(100,b>0?sp/b*100:0)}%"></b>${per.current?`<i style="left:${Math.min(100,per.elapsed/per.total*100)}%"></i>`:""}${us!=null&&b>0?`<i class="avg" style="left:${Math.min(100,us/b*100)}%"></i>`:""}</div>
-      <div class="s">${txt}${us!=null?` · normaal ${eur(us)} op dit punt`:""}</div></div>`;
+      <div class="t2"><b style="width:${Math.min(100,b>0?sp/b*100:0)}%"></b>${pp.current?`<i style="left:${Math.min(100,pp.elapsed/pp.total*100)}%"></i>`:""}${us!=null&&b>0?`<i class="avg" style="left:${Math.min(100,us/b*100)}%"></i>`:""}</div>
+      <div class="s">${txt}${us!=null?` · normaal ${eur(us)} op dit punt`:""}${mj?`<br><span style="color:var(--mute)">beoordeeld over heel ${pp.label} · deze week ${eur(wk)}</span>`:""}</div></div>`;
   }).join("");
-  document.querySelectorAll("#dash-pots .dp").forEach(el=>el.addEventListener("click",()=>openPot(el.dataset.pot, true, tx.filter(t=>t.booking_date>=per.s && t.booking_date<=per.e), potLabel(el.dataset.pot)+" · "+per.label)));
+  document.querySelectorAll("#dash-pots .dp").forEach(el=>el.addEventListener("click",()=>{ const pp = PP[el.dataset.pot]; openPot(el.dataset.pot, true, tx.filter(t=>t.booking_date>=pp.s && t.booking_date<=pp.e), potLabel(el.dataset.pot)+" · "+(pp.label||per.label)); }));
   const todo = REVIEW.length; $("#dash-todo").classList.toggle("hidden", !todo); if (todo) $("#dash-todo").textContent = `${todo} ${todo===1?"mutatie":"mutaties"} nog in te delen ›`;
 }
 
